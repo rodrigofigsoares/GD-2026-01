@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' 'unsafe-inline' https://cdn.babylonjs.com https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.babylonjs.com https://cdn.jsdelivr.net; worker-src 'self' blob:;">
+  <title>Gêmeo Digital — Painéis Solares</title>
+  <style>
+    /* ── CSS Variables ─────────────────────────────────── */
+    :root {
+      --bg:             #0d1117;
+      --surface:        #161b22;
+      --border:         #21262d;
+      --border2:        #30363d;
+      --text:           #c9d1d9;
+      --text-dim:       #8b949e;
+      --text-muted:     #484f58;
+      --text-bright:    #e6edf3;
+      --input-bg:       #0d1117;
+      --canvas-bg:      #0d1117;
+      --badge-blue-bg:  #1f3d5c;
+      --badge-blue-fg:  #79c0ff;
+      --badge-green-bg: #1a3624;
+      --badge-green-fg: #56d364;
+      --accent:         #238636;
+      --accent-h:       #2ea043;
+      --ph-bg:          #21262d;
+      --ph-fg:          #30363d;
+      --btn-dis-bg:     #21262d;
+      --btn-dis-fg:     #484f58;
+    }
+
+    body.light {
+      --bg:             #f6f8fa;
+      --surface:        #ffffff;
+      --border:         #d0d7de;
+      --border2:        #d0d7de;
+      --text:           #24292f;
+      --text-dim:       #57606a;
+      --text-muted:     #8c959f;
+      --text-bright:    #1f2328;
+      --input-bg:       #f6f8fa;
+      --canvas-bg:      #eaeef2;
+      --badge-blue-bg:  #ddf4ff;
+      --badge-blue-fg:  #0550ae;
+      --badge-green-bg: #dafbe1;
+      --badge-green-fg: #1a7f37;
+      --accent:         #1a7f37;
+      --accent-h:       #116329;
+      --ph-bg:          #eaeef2;
+      --ph-fg:          #8c959f;
+      --btn-dis-bg:     #eaeef2;
+      --btn-dis-fg:     #8c959f;
+    }
+
+    /* ── Reset & Base ────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    /* ── Config Overlay ─────────────────────────────── */
+    #config-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: opacity 0.2s;
+    }
+    #config-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    .config-card {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 12px;
+      padding: 40px 44px;
+      width: 500px;
+    }
+
+    .config-logo { font-size: 1.5rem; margin-bottom: 6px; }
+
+    .config-card h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 4px;
+    }
+
+    #cfg-subtitle-text { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 30px; }
+
+    .field { margin-bottom: 20px; }
+
+    .field > label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+
+    .field input[type="text"],
+    .field select {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text-bright);
+      padding: 9px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+      appearance: none;
+    }
+    .field input[type="text"]:focus,
+    .field select:focus { border-color: var(--badge-blue-fg); }
+    .field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b949e' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+      cursor: pointer;
+    }
+    .field select option { background: var(--surface); color: var(--text-bright); }
+
+    .field-row { display: flex; gap: 12px; margin-bottom: 20px; }
+    .field-row .field { flex: 1; margin-bottom: 0; }
+
+    .grid-inputs { display: flex; gap: 10px; align-items: flex-end; }
+    .grid-inputs .mini { flex: 1; }
+    .grid-inputs .mini label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+    .grid-inputs input[type="number"] {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text-bright);
+      padding: 9px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+      -moz-appearance: textfield;
+    }
+    .grid-inputs input[type="number"]::-webkit-inner-spin-button,
+    .grid-inputs input[type="number"]::-webkit-outer-spin-button { opacity: 0.5; }
+    .grid-inputs input[type="number"]:focus { border-color: var(--badge-blue-fg); }
+    .grid-sep { padding-bottom: 9px; color: var(--text-dim); font-size: 1.1rem; flex-shrink: 0; }
+
+    .grid-preview { font-size: 0.85rem; color: var(--badge-blue-fg); margin-top: 8px; min-height: 18px; }
+    .grid-preview.error { color: #f85149; }
+
+    .btn-submit {
+      width: 100%;
+      margin-top: 28px;
+      padding: 11px;
+      background: var(--accent);
+      color: #fff;
+      border: 1px solid rgba(240,246,252,0.1);
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-submit:hover:not(:disabled) { background: var(--accent-h); }
+    .btn-submit:disabled {
+      background: var(--btn-dis-bg);
+      color: var(--btn-dis-fg);
+      cursor: not-allowed;
+      border-color: var(--border2);
+    }
+
+    /* ── Main App Layout ────────────────────────────── */
+    #app { display: flex; flex-direction: column; height: 100vh; visibility: hidden; }
+    #app.visible { visibility: visible; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 9px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      -webkit-app-region: drag;
+    }
+    header h1 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-bright);
+      -webkit-app-region: no-drag;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 4px;
+      letter-spacing: 0.02em;
+    }
+    .badge-blue  { background: var(--badge-blue-bg);  color: var(--badge-blue-fg); }
+    .badge-green { background: var(--badge-green-bg); color: var(--badge-green-fg); }
+
+    .header-spacer { flex: 1; }
+
+    .sim-status {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.76rem;
+      color: var(--text-dim);
+      -webkit-app-region: no-drag;
+    }
+    .sim-stat strong { color: var(--text-bright); font-weight: 600; }
+    .sim-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .btn-theme {
+      -webkit-app-region: no-drag;
+      background: none;
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text-dim);
+      padding: 4px 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      line-height: 1;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-theme:hover { border-color: var(--text-dim); color: var(--text); }
+
+    .main-area { display: flex; flex: 1; overflow: hidden; }
+
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .sidebar-left  { border-right: 1px solid var(--border); }
+    .sidebar-right { border-left:  1px solid var(--border); }
+    .sidebar-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+
+    .section-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    /* ── Simulation Controls ────────────────────────── */
+    .ctrl-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-ctrl {
+      width: 40px;
+      height: 34px;
+      background: var(--ph-bg);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text-dim);
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      font-family: inherit;
+    }
+    .btn-ctrl:hover  { background: var(--border2); color: var(--text); }
+    .btn-ctrl.active { color: var(--text-bright); border-color: var(--accent); }
+
+    .btn-speed {
+      flex: 1;
+      height: 34px;
+      background: var(--ph-bg);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .btn-speed:hover  { background: var(--border2); color: var(--text); }
+    .btn-speed.active { color: var(--badge-green-fg); border-color: var(--accent); }
+
+    /* ── Placeholder blocks (Chaos Mode — Phase 5) ─── */
+    .placeholder-block {
+      background: var(--ph-bg);
+      border-radius: 6px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ph-fg);
+      font-size: 0.72rem;
+      margin-bottom: 8px;
+    }
+
+    /* ── Sensor Cards ────────────────────────────────── */
+    .sensor-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .sensor-card:last-child { border-bottom: none; }
+
+    .sensor-lbl {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    .sensor-val {
+      font-size: 1.0rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      font-variant-numeric: tabular-nums;
+      transition: color 0.3s ease;
+    }
+
+    /* ── Canvas ──────────────────────────────────────── */
+    #canvas-container { flex: 1; position: relative; background: var(--canvas-bg); }
+    #renderCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
+
+    .canvas-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      pointer-events: none;
+    }
+    .canvas-placeholder svg { opacity: 0.3; }
+    .canvas-placeholder p { font-size: 0.8rem; color: var(--ph-fg); }
+
+    /* ── Panel Tooltip ──────────────────────────────── */
+    #panel-tooltip {
+      display: none;
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      min-width: 210px;
+      z-index: 10;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+    }
+
+    .tt-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tt-panel-id {
+      font-family: 'Courier New', monospace;
+      font-size: 0.82rem;
+      color: var(--badge-blue-fg);
+      font-weight: 600;
+    }
+    .tt-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      line-height: 1;
+      padding: 0 2px;
+    }
+    .tt-close:hover { color: var(--text); }
+
+    .tt-body { padding: 8px 12px 12px; }
+    .tt-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      font-size: 0.82rem;
+    }
+    .tt-lbl { color: var(--text-dim); }
+    .tt-val { color: var(--text-bright); font-weight: 600; }
+    .tt-val.status-normal      { color: var(--badge-green-fg); }
+    .tt-val.status-overheat    { color: #e6501f; }
+    .tt-val.status-sensor_fail { color: var(--text-muted); }
+    .tt-val.status-corrupted   { color: #8b5cf6; }
+
+    /* ── Chaos Mode ─────────────────────────────────── */
+    .chaos-target {
+      background: var(--ph-bg);
+      border-radius: 6px;
+      padding: 7px 10px;
+      margin-bottom: 10px;
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+    }
+
+    #chaos-hint {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    #chaos-panel-id {
+      font-family: 'Courier New', monospace;
+      font-size: 0.80rem;
+      color: var(--badge-blue-fg);
+      font-weight: 600;
+    }
+
+    .btn-chaos {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 10px;
+      background: var(--ph-bg);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text-dim);
+      font-size: 0.80rem;
+      font-family: inherit;
+      cursor: pointer;
+      margin-bottom: 6px;
+      text-align: left;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .btn-chaos:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-chaos:not(:disabled):hover { background: var(--border2); color: var(--text); }
+
+    .btn-chaos.f-overheat    { border-color: #e6501f; color: #e6501f; background: rgba(230,80,31,0.10); }
+    .btn-chaos.f-sensor_fail { border-color: var(--text-muted); color: var(--text-dim); background: rgba(72,79,88,0.12); }
+    .btn-chaos.f-corrupted   { border-color: #8b5cf6; color: #8b5cf6; background: rgba(139,92,246,0.10); }
+
+    .chaos-active-wrap { margin-top: 8px; }
+
+    .chaos-active-hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    #chaos-active-count {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+
+    #btn-chaos-clear-all {
+      font-size: 0.68rem;
+      background: none;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--text-muted);
+      padding: 2px 7px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    #btn-chaos-clear-all:hover { border-color: #f85149; color: #f85149; }
+
+    .chaos-active-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.72rem;
+    }
+    .chaos-active-item:last-child { border-bottom: none; }
+
+    .chaos-item-id {
+      font-family: 'Courier New', monospace;
+      color: var(--text-dim);
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chaos-item-failure {
+      font-weight: 600;
+      margin: 0 6px;
+      flex-shrink: 0;
+    }
+    .chaos-item-failure.overheat    { color: #e6501f; }
+    .chaos-item-failure.sensor_fail { color: var(--text-muted); }
+    .chaos-item-failure.corrupted   { color: #8b5cf6; }
+
+    .chaos-item-clear {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 0 2px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .chaos-item-clear:hover { color: #f85149; }
+
+    /* Chaos section slide-in (on enable) */
+    @keyframes section-slide-in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #section-chaos.chaos-slide-in { animation: section-slide-in 0.22s ease forwards; }
+
+    /* Menu-triggered highlight */
+    @keyframes chaos-glow {
+      0%, 100% { border-color: var(--border); }
+      50%       { border-color: #e6501f; }
+    }
+    #section-chaos.chaos-highlight { animation: chaos-glow 0.4s ease 3; }
+
+    /* Panel tooltip entrance */
+    @keyframes tooltip-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #panel-tooltip.tt-animate { animation: tooltip-in 0.15s ease forwards; }
+
+    /* Status bar first-reveal */
+    @keyframes status-fade-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    /* ── Footer & Chart ──────────────────────────────── */
+    footer {
+      height: 150px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 10px 20px 8px;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 106px;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ Tela de Configuração ══════════════════════════════════════ -->
+<div id="config-overlay">
+  <div class="config-card">
+    <div class="config-logo">☀</div>
+    <h1 id="cfg-title">Gêmeo Digital — Painel Solar</h1>
+    <p id="cfg-subtitle-text">Configure a instalação antes de iniciar a simulação.</p>
+
+    <div class="field">
+      <label id="cfg-label-name">Nome da instalação</label>
+      <input type="text" id="cfg-name" placeholder="Ex: Goiânia — Telhado Industrial" maxlength="60">
+    </div>
+
+    <div class="field">
+      <label id="cfg-label-type">Tipo de painel</label>
+      <select id="cfg-type">
+        <option value="60CEL">60 células — 360 Wp · 1,65 m²</option>
+        <option value="72CEL">72 células — 440 Wp · 2,00 m²</option>
+        <option value="MODERNO">Moderno (alta densidade) — 682 Wp · 3,10 m²</option>
+      </select>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label id="cfg-label-lang">Idioma</label>
+        <select id="cfg-lang">
+          <option value="pt">Português</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label id="cfg-label-grid">Grade de painéis</label>
+      <div class="grid-inputs">
+        <div class="mini">
+          <label id="cfg-label-rows">Linhas</label>
+          <input type="number" id="cfg-rows" value="3" min="2" max="10">
+        </div>
+        <span class="grid-sep">×</span>
+        <div class="mini">
+          <label id="cfg-label-cols">Colunas</label>
+          <input type="number" id="cfg-cols" value="3" min="2" max="10">
+        </div>
+      </div>
+      <div class="grid-preview" id="grid-preview"></div>
+    </div>
+
+    <button class="btn-submit" id="btn-submit">Iniciar simulação</button>
+  </div>
+</div>
+
+<!-- ══ App Principal ═════════════════════════════════════════════ -->
+<div id="app">
+  <header>
+    <h1 id="header-name">—</h1>
+    <span class="badge badge-blue"  id="header-type">—</span>
+    <span class="badge badge-green" id="header-grid">—</span>
+    <div class="header-spacer"></div>
+    <div class="sim-status" id="sim-status" style="display:none;">
+      <span class="sim-dot"></span>
+      <span class="sim-stat" id="sim-ts">—</span>
+      <span class="sim-stat"><span id="sim-ghi-label">GHI</span> <strong id="sim-ghi">—</strong> W/m²</span>
+      <span class="sim-stat"><span id="sim-eff-label">Efic</span> <strong id="sim-eff">—</strong>%</span>
+      <span class="sim-stat"><span id="sim-pow-label">Pot</span> <strong id="sim-pow">—</strong></span>
+    </div>
+    <button class="btn-theme" id="btn-theme">☀️</button>
+  </header>
+
+  <div class="main-area">
+
+    <!-- ── Left sidebar: controls ── -->
+    <aside class="sidebar sidebar-left">
+      <div class="sidebar-section">
+        <div class="section-title" id="sb-simulation">Simulação</div>
+        <div class="ctrl-row">
+          <button class="btn-ctrl active" id="btn-play-pause" title="Pausar">⏸</button>
+          <button class="btn-speed active" id="btn-speed-1x">1×</button>
+          <button class="btn-speed" id="btn-speed-5x">5×</button>
+        </div>
+      </div>
+      <div class="sidebar-section" id="section-chaos" style="display:none">
+        <div class="section-title" id="sb-chaos">Chaos Mode</div>
+
+        <!-- Painel selecionado -->
+        <div class="chaos-target">
+          <span id="chaos-hint">Clique num painel para selecionar</span>
+          <span id="chaos-panel-id" style="display:none"></span>
+        </div>
+
+        <!-- Botões de falha -->
+        <button class="btn-chaos" id="btn-chaos-overheat" disabled>
+          <span>🔥</span><span id="chaos-lbl-overheat">Superaquecimento</span>
+        </button>
+        <button class="btn-chaos" id="btn-chaos-sensor" disabled>
+          <span>⚠</span><span id="chaos-lbl-sensor">Falha de sensor</span>
+        </button>
+        <button class="btn-chaos" id="btn-chaos-corrupted" disabled>
+          <span>?</span><span id="chaos-lbl-corrupted">Dado corrompido</span>
+        </button>
+
+        <!-- Falhas ativas -->
+        <div class="chaos-active-wrap" id="chaos-active-wrap" style="display:none">
+          <div class="chaos-active-hdr">
+            <span id="chaos-active-count"></span>
+            <button id="btn-chaos-clear-all">Limpar todas</button>
+          </div>
+          <div id="chaos-active-list"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── Canvas ── -->
+    <div id="canvas-container">
+      <canvas id="renderCanvas"></canvas>
+
+      <div class="canvas-placeholder" id="canvas-ph">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1" style="color:var(--ph-fg)">
+          <rect x="2" y="3" width="20" height="14" rx="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        <p id="ph-viewport">Viewport 3D</p>
+      </div>
+
+      <!-- Panel tooltip -->
+      <div id="panel-tooltip">
+        <div class="tt-header">
+          <span class="tt-panel-id" id="tt-id">—</span>
+          <button class="tt-close" id="tt-close">✕</button>
+        </div>
+        <div class="tt-body">
+          <div class="tt-row">
+            <span class="tt-lbl" id="tt-lbl-status">Status</span>
+            <span class="tt-val" id="tt-status">—</span>
+          </div>
+          <div class="tt-row">
+            <span class="tt-lbl" id="tt-lbl-power">Potência</span>
+            <span class="tt-val" id="tt-power">—</span>
+          </div>
+          <div class="tt-row">
+            <span class="tt-lbl" id="tt-lbl-eff">Eficiência</span>
+            <span class="tt-val" id="tt-eff">—</span>
+          </div>
+          <div class="tt-row">
+            <span class="tt-lbl" id="tt-lbl-temp">Temp. célula</span>
+            <span class="tt-val" id="tt-temp">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Right sidebar: sensor cards ── -->
+    <aside class="sidebar sidebar-right">
+      <div class="sidebar-section">
+        <div class="section-title" id="sb-irr">Irradiação</div>
+        <div class="sensor-card">
+          <span class="sensor-lbl" id="sc-ghi-lbl">GHI</span>
+          <span class="sensor-val" id="sensor-ghi">—</span>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="section-title" id="sb-temp">Temperatura</div>
+        <div class="sensor-card">
+          <span class="sensor-lbl" id="sc-air-lbl">Ar</span>
+          <span class="sensor-val" id="sensor-air">—</span>
+        </div>
+        <div class="sensor-card">
+          <span class="sensor-lbl" id="sc-cell-lbl">Célula</span>
+          <span class="sensor-val" id="sensor-cell">—</span>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="section-title" id="sb-perf">Desempenho</div>
+        <div class="sensor-card">
+          <span class="sensor-lbl" id="sc-eff-lbl">Eficiência média</span>
+          <span class="sensor-val" id="sensor-eff">—</span>
+        </div>
+        <div class="sensor-card">
+          <span class="sensor-lbl" id="sc-pow-lbl">Potência total</span>
+          <span class="sensor-val" id="sensor-pow">—</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ── Footer: power chart ── -->
+  <footer>
+    <div class="section-title" id="footer-title">Geração de energia — últimas horas simuladas</div>
+    <div class="chart-wrapper">
+      <canvas id="power-chart"></canvas>
+    </div>
+  </footer>
+</div>
+
+<!-- Scripts: CDN libs first, then local modules, then inline init -->
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="scene.js"></script>
+<script src="dashboard.js"></script>
+<script src="app.js"></script>
+
+<script>
+  // ── Translations ─────────────────────────────────────
+  const LANG = {
+    pt: {
+      'cfg.title':       'Gêmeo Digital — Painel Solar',
+      'cfg.subtitle':    'Configure a instalação antes de iniciar a simulação.',
+      'cfg.lbl.name':    'Nome da instalação',
+      'cfg.ph.name':     'Ex: Goiânia — Telhado Industrial',
+      'cfg.lbl.type':    'Tipo de painel',
+      'cfg.lbl.lang':    'Idioma',
+      'cfg.lbl.grid':    'Grade de painéis',
+      'cfg.lbl.rows':    'Linhas',
+      'cfg.lbl.cols':    'Colunas',
+      'cfg.submit':      'Iniciar simulação',
+      'cfg.preview':     (r,c,t) => `${r} × ${c} = ${t} painéis`,
+      'cfg.err.min2':    'Mínimo: 2 linhas e 2 colunas.',
+      'cfg.err.min6':    (r,c,t) => `${r} × ${c} = ${t} painéis — mínimo é 6.`,
+      'cfg.err.max100':  (r,c,t) => `${r} × ${c} = ${t} painéis — máximo é 100.`,
+      'pt.60CEL':        '60 células — 360 Wp · 1,65 m²',
+      'pt.72CEL':        '72 células — 440 Wp · 2,00 m²',
+      'pt.MODERNO':      'Moderno (alta densidade) — 682 Wp · 3,10 m²',
+      'hdr.60CEL':       '60 células — 360 Wp',
+      'hdr.72CEL':       '72 células — 440 Wp',
+      'hdr.MODERNO':     'Moderno — 682 Wp',
+      'hdr.panels':      (r,c,tot) => `${r} × ${c}  (${tot} painéis)`,
+      'sb.simulation':   'Simulação',
+      'sb.chaos':        'Chaos Mode',
+      'sb.irr':          'Irradiação',
+      'sb.temp':         'Temperatura',
+      'sb.perf':         'Desempenho',
+      'ph.viewport':     'Viewport 3D',
+      'chaos.hint':         'Clique num painel para selecionar',
+      'chaos.lbl.overheat': 'Superaquecimento',
+      'chaos.lbl.sensor':   'Falha de sensor',
+      'chaos.lbl.corrupted':'Dado corrompido',
+      'chaos.clear.all':    'Limpar todas',
+      'chaos.active':       (n) => n === 1 ? '1 falha ativa' : `${n} falhas ativas`,
+      'chaos.f.overheat':   'Superaquec.',
+      'chaos.f.sensor_fail':'Sensor fail',
+      'chaos.f.corrupted':  'Corrompido',
+      'footer.title':    'Geração de energia — últimas horas simuladas',
+      'sim.ghi':         'GHI',
+      'sim.eff':         'Efic',
+      'sim.pow':         'Pot',
+      'sc.ghi':          'GHI',
+      'sc.air':          'Ar',
+      'sc.cell':         'Célula',
+      'sc.eff':          'Eficiência média',
+      'sc.pow':          'Potência total',
+      'chart.label':     'Potência Total (W)',
+      'ctrl.pause':      'Pausar',
+      'ctrl.resume':     'Retomar',
+      'theme.dark':      '☀️',
+      'theme.light':     '🌙',
+      'theme.title':     'Alternar tema',
+      'tt.status':       'Status',
+      'tt.power':        'Potência',
+      'tt.eff':          'Eficiência',
+      'tt.temp':         'Temp. célula',
+      'tt.s.normal':     'Normal',
+      'tt.s.overheat':   'Superaquecimento',
+      'tt.s.sensor_fail':'Falha de sensor',
+      'tt.s.corrupted':  'Corrompido',
+      'tt.na':           'N/A',
+    },
+    en: {
+      'cfg.title':       'Digital Twin — Solar Panels',
+      'cfg.subtitle':    'Set up your installation before starting the simulation.',
+      'cfg.lbl.name':    'Installation name',
+      'cfg.ph.name':     'e.g. Goiânia — Industrial Rooftop',
+      'cfg.lbl.type':    'Panel type',
+      'cfg.lbl.lang':    'Language',
+      'cfg.lbl.grid':    'Panel grid',
+      'cfg.lbl.rows':    'Rows',
+      'cfg.lbl.cols':    'Cols',
+      'cfg.submit':      'Start simulation',
+      'cfg.preview':     (r,c,t) => `${r} × ${c} = ${t} panels`,
+      'cfg.err.min2':    'Minimum: 2 rows and 2 columns.',
+      'cfg.err.min6':    (r,c,t) => `${r} × ${c} = ${t} panels — minimum is 6.`,
+      'cfg.err.max100':  (r,c,t) => `${r} × ${c} = ${t} panels — maximum is 100.`,
+      'pt.60CEL':        '60 cells — 360 Wp · 1.65 m²',
+      'pt.72CEL':        '72 cells — 440 Wp · 2.00 m²',
+      'pt.MODERNO':      'Modern (high density) — 682 Wp · 3.10 m²',
+      'hdr.60CEL':       '60 cells — 360 Wp',
+      'hdr.72CEL':       '72 cells — 440 Wp',
+      'hdr.MODERNO':     'Modern — 682 Wp',
+      'hdr.panels':      (r,c,tot) => `${r} × ${c}  (${tot} panels)`,
+      'sb.simulation':   'Simulation',
+      'sb.chaos':        'Chaos Mode',
+      'sb.irr':          'Irradiation',
+      'sb.temp':         'Temperature',
+      'sb.perf':         'Performance',
+      'ph.viewport':     '3D Viewport',
+      'chaos.hint':         'Click a panel to select',
+      'chaos.lbl.overheat': 'Overheat',
+      'chaos.lbl.sensor':   'Sensor failure',
+      'chaos.lbl.corrupted':'Corrupted data',
+      'chaos.clear.all':    'Clear all',
+      'chaos.active':       (n) => n === 1 ? '1 active failure' : `${n} active failures`,
+      'chaos.f.overheat':   'Overheat',
+      'chaos.f.sensor_fail':'Sensor fail',
+      'chaos.f.corrupted':  'Corrupted',
+      'footer.title':    'Energy generation — last simulated hours',
+      'sim.ghi':         'GHI',
+      'sim.eff':         'Eff',
+      'sim.pow':         'Pwr',
+      'sc.ghi':          'GHI',
+      'sc.air':          'Air',
+      'sc.cell':         'Cell',
+      'sc.eff':          'Avg. efficiency',
+      'sc.pow':          'Total power',
+      'chart.label':     'Total Power (W)',
+      'ctrl.pause':      'Pause',
+      'ctrl.resume':     'Resume',
+      'theme.dark':      '☀️',
+      'theme.light':     '🌙',
+      'theme.title':     'Toggle theme',
+      'tt.status':       'Status',
+      'tt.power':        'Power',
+      'tt.eff':          'Efficiency',
+      'tt.temp':         'Cell temp.',
+      'tt.s.normal':     'Normal',
+      'tt.s.overheat':   'Overheat',
+      'tt.s.sensor_fail':'Sensor failure',
+      'tt.s.corrupted':  'Corrupted',
+      'tt.na':           'N/A',
+    },
+  };
+
+  let currentLang   = localStorage.getItem('lang')  || 'pt';
+  let currentTheme  = localStorage.getItem('theme') || 'dark';
+  let currentConfig = null;
+
+  function t(key) {
+    return LANG[currentLang]?.[key] ?? LANG['pt'][key] ?? key;
+  }
+  window.t = t; // exposed to dashboard.js and app.js
+
+  // ── Theme ──────────────────────────────────────────────
+  function applyTheme(theme) {
+    currentTheme = theme;
+    document.body.classList.toggle('light', theme === 'light');
+    const btn = document.getElementById('btn-theme');
+    btn.textContent = theme === 'light' ? t('theme.light') : t('theme.dark');
+    btn.title       = t('theme.title');
+    localStorage.setItem('theme', theme);
+    window.Dashboard?.updateTheme(theme);
+  }
+
+  document.getElementById('btn-theme').addEventListener('click', () => {
+    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+  });
+
+  // ── Translations ───────────────────────────────────────
+  function applyTranslations(lang) {
+    currentLang = lang;
+    document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en';
+    localStorage.setItem('lang', lang);
+
+    // Config overlay
+    document.getElementById('cfg-title').textContent         = t('cfg.title');
+    document.getElementById('cfg-subtitle-text').textContent = t('cfg.subtitle');
+    document.getElementById('cfg-label-name').textContent    = t('cfg.lbl.name');
+    document.getElementById('cfg-name').placeholder          = t('cfg.ph.name');
+    document.getElementById('cfg-label-type').textContent    = t('cfg.lbl.type');
+    document.getElementById('cfg-label-lang').textContent    = t('cfg.lbl.lang');
+    document.getElementById('cfg-label-grid').textContent    = t('cfg.lbl.grid');
+    document.getElementById('cfg-label-rows').textContent    = t('cfg.lbl.rows');
+    document.getElementById('cfg-label-cols').textContent    = t('cfg.lbl.cols');
+    document.getElementById('btn-submit').textContent        = t('cfg.submit');
+
+    const typeOpts = document.getElementById('cfg-type').options;
+    ['60CEL','72CEL','MODERNO'].forEach((v, i) => {
+      typeOpts[i].textContent = t(`pt.${v}`);
+    });
+
+    // Sidebar headings
+    document.getElementById('sb-simulation').textContent = t('sb.simulation');
+    document.getElementById('sb-chaos').textContent      = t('sb.chaos');
+    document.getElementById('sb-irr').textContent        = t('sb.irr');
+    document.getElementById('sb-temp').textContent       = t('sb.temp');
+    document.getElementById('sb-perf').textContent       = t('sb.perf');
+
+    // Chaos Mode
+    document.getElementById('chaos-hint').textContent          = t('chaos.hint');
+    document.getElementById('chaos-lbl-overheat').textContent  = t('chaos.lbl.overheat');
+    document.getElementById('chaos-lbl-sensor').textContent    = t('chaos.lbl.sensor');
+    document.getElementById('chaos-lbl-corrupted').textContent = t('chaos.lbl.corrupted');
+    const clearAllBtn = document.getElementById('btn-chaos-clear-all');
+    if (clearAllBtn) clearAllBtn.textContent = t('chaos.clear.all');
+
+    // Canvas placeholder
+    document.getElementById('ph-viewport').textContent   = t('ph.viewport');
+
+    // Footer
+    document.getElementById('footer-title').textContent  = t('footer.title');
+
+    // Header status bar
+    document.getElementById('sim-ghi-label').textContent = t('sim.ghi');
+    document.getElementById('sim-eff-label').textContent = t('sim.eff');
+    document.getElementById('sim-pow-label').textContent = t('sim.pow');
+
+    // Sensor card labels
+    document.getElementById('sc-ghi-lbl').textContent    = t('sc.ghi');
+    document.getElementById('sc-air-lbl').textContent    = t('sc.air');
+    document.getElementById('sc-cell-lbl').textContent   = t('sc.cell');
+    document.getElementById('sc-eff-lbl').textContent    = t('sc.eff');
+    document.getElementById('sc-pow-lbl').textContent    = t('sc.pow');
+
+    // Tooltip labels
+    document.getElementById('tt-lbl-status').textContent = t('tt.status');
+    document.getElementById('tt-lbl-power').textContent  = t('tt.power');
+    document.getElementById('tt-lbl-eff').textContent    = t('tt.eff');
+    document.getElementById('tt-lbl-temp').textContent   = t('tt.temp');
+
+    // Update chart label and control button titles
+    window.Dashboard?.updateChartLabel(t('chart.label'));
+    window.Dashboard?.syncControls();
+
+    applyTheme(currentTheme);
+    validateGrid();
+    if (currentConfig) applyConfig(currentConfig, false);
+  }
+
+  document.getElementById('cfg-lang').addEventListener('change', (e) => {
+    applyTranslations(e.target.value);
+  });
+
+  // ── Grid validation ────────────────────────────────────
+  const rowsIn    = document.getElementById('cfg-rows');
+  const colsIn    = document.getElementById('cfg-cols');
+  const preview   = document.getElementById('grid-preview');
+  const submitBtn = document.getElementById('btn-submit');
+
+  function validateGrid() {
+    const rows  = parseInt(rowsIn.value)  || 0;
+    const cols  = parseInt(colsIn.value)  || 0;
+    const total = rows * cols;
+
+    if (rows < 2 || cols < 2) {
+      preview.textContent = t('cfg.err.min2');
+      preview.className   = 'grid-preview error';
+      submitBtn.disabled  = true;
+      return;
+    }
+    if (total < 6) {
+      preview.textContent = t('cfg.err.min6')(rows, cols, total);
+      preview.className   = 'grid-preview error';
+      submitBtn.disabled  = true;
+      return;
+    }
+    if (total > 100) {
+      preview.textContent = t('cfg.err.max100')(rows, cols, total);
+      preview.className   = 'grid-preview error';
+      submitBtn.disabled  = true;
+      return;
+    }
+
+    preview.textContent = t('cfg.preview')(rows, cols, total);
+    preview.className   = 'grid-preview';
+    submitBtn.disabled  = false;
+  }
+
+  rowsIn.addEventListener('input', validateGrid);
+  colsIn.addEventListener('input', validateGrid);
+
+  // ── Config submit ──────────────────────────────────────
+  submitBtn.addEventListener('click', () => {
+    const rows = parseInt(rowsIn.value);
+    const cols = parseInt(colsIn.value);
+    const name = document.getElementById('cfg-name').value.trim() || 'Instalação Solar';
+    const type = document.getElementById('cfg-type').value;
+    const lang = document.getElementById('cfg-lang').value;
+
+    currentConfig = { name, type, rows, cols, lang };
+    window.electronAPI.submitConfig(currentConfig);
+    applyConfig(currentConfig, true);
+  });
+
+  function applyConfig(cfg, transition = true) {
+    document.title = `${cfg.name} — Gêmeo Digital`;
+    document.getElementById('header-name').textContent = cfg.name;
+    document.getElementById('header-type').textContent = t(`hdr.${cfg.type}`);
+    document.getElementById('header-grid').textContent =
+      t('hdr.panels')(cfg.rows, cfg.cols, cfg.rows * cfg.cols);
+
+    if (transition) {
+      document.getElementById('config-overlay').classList.add('hidden');
+      document.getElementById('app').classList.add('visible');
+      hidePanelTooltip();
+      window.Dashboard?.init();
+
+      // Two rAFs ensure the canvas has real dimensions before Babylon reads them
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.getElementById('canvas-ph').style.display = 'none';
+        const canvas = document.getElementById('renderCanvas');
+        window.AppScene?.init(canvas, cfg);
+      }));
+    }
+  }
+
+  // ── Reopen settings ────────────────────────────────────
+  function populateConfigForm(cfg) {
+    if (!cfg) return;
+    document.getElementById('cfg-name').value = cfg.name;
+    document.getElementById('cfg-type').value = cfg.type;
+    document.getElementById('cfg-lang').value = cfg.lang || currentLang;
+    rowsIn.value = cfg.rows;
+    colsIn.value = cfg.cols;
+    validateGrid();
+  }
+
+  window.electronAPI.onOpenSettings(() => {
+    populateConfigForm(currentConfig);
+    document.getElementById('app').classList.remove('visible');
+    document.getElementById('config-overlay').classList.remove('hidden');
+    hidePanelTooltip();
+  });
+
+  // ── Panel Tooltip ──────────────────────────────────────
+  function showPanelTooltip(p) {
+    document.getElementById('tt-id').textContent = `panel_${p.row}_${p.col}`;
+
+    const isCorrupted = p.status === 'corrupted';
+    const na = t('tt.na');
+
+    const statusEl = document.getElementById('tt-status');
+    statusEl.textContent = isCorrupted ? na : (t(`tt.s.${p.status}`) || p.status);
+    statusEl.className   = `tt-val status-${p.status}`;
+
+    document.getElementById('tt-power').textContent =
+      isCorrupted ? na : `${p.power.toFixed(1)} W`;
+    document.getElementById('tt-eff').textContent   =
+      isCorrupted ? na : `${p.efficiency.toFixed(1)}%`;
+    document.getElementById('tt-temp').textContent  =
+      isCorrupted ? na : `${p.cellTemp.toFixed(1)} °C`;
+
+    const tt = document.getElementById('panel-tooltip');
+    tt.style.display = 'block';
+    tt.classList.remove('tt-animate');
+    void tt.offsetWidth; // reflow para reiniciar animação
+    tt.classList.add('tt-animate');
+    window.Dashboard?.selectPanel(p);
+  }
+
+  function hidePanelTooltip() {
+    document.getElementById('panel-tooltip').style.display = 'none';
+  }
+
+  window.showPanelTooltip = showPanelTooltip;
+  window.hidePanelTooltip = hidePanelTooltip;
+
+  document.getElementById('tt-close').addEventListener('click', hidePanelTooltip);
+
+  // ── Init ───────────────────────────────────────────────
+  applyTranslations(currentLang);
+  document.getElementById('cfg-lang').value = currentLang;
+  applyTheme(currentTheme);
+  validateGrid();
+</script>
+
+</body>
+</html>

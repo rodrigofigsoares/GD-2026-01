@@ -1,0 +1,26 @@
+Parâmetros do Modelo — Gêmeo Digital de Painel Solar,,,,,
+,,,,,
+Localização,,,,,
+ID de localização (arquivo previsão),17366,,,,
+Latitude — NASA POWER (histórico),-16.7005,°,,,
+Longitude — NASA POWER (histórico),-49,°,,,
+Elevação (MERRA-2),970.61,m,,,
+Latitude — previsão (gemeo),-16.7005,°,,,
+Longitude — previsão (gemeo),-49.249,°,,,
+,,,,,
+Constantes do modelo fotovoltaico,,,,,
+Performance Ratio do sistema (PR),0.8,(fração),,,Perdas típicas de inversor/cabos/sujidade/descasamento (75–85% é faixa usual)
+NOCT — temp. nominal de operação da célula,45,°C,,,Valor típico de datasheet para módulos cristalinos
+Coeficiente de temperatura de potência (γ),-0.004,/°C,,,"Silício cristalino padrão (≈ −0,40%/°C)"
+Temperatura de referência STC (T_ref),25,°C,,,Condição padrão de teste (STC)
+,,,,,
+Irradiação climatológica de referência (Atlas Brasileiro de Energia Solar),,,,,
+Mês,Irradiação (Wh/m²/dia),,,,
+4,5120,,,,
+5,5024,,,,
+,,,,,
+Especificação dos painéis solares,,,,,
+Painel,Área (m²),Eficiência (%),P_pico (Wp),,
+60CEL,1.65,0.22,360,,
+72CEL,2,0.22,440,,
+MODERNO,3.1,0.22,682,,
