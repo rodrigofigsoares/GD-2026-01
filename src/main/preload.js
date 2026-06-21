@@ -10,9 +10,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('settings:open');
     ipcRenderer.on('settings:open', () => cb());
   },
-  onChaosToggle: (cb) => {
-    ipcRenderer.removeAllListeners('chaos:toggle');
-    ipcRenderer.on('chaos:toggle', (_e, enabled) => cb(enabled));
+  onChaosOpen: (cb) => {
+    ipcRenderer.removeAllListeners('chaos:open');
+    ipcRenderer.on('chaos:open', () => cb());
   },
 
   // Simulation data → renderer

@@ -46,9 +46,7 @@ function buildMenu() {
         {
           label:       'Chaos Mode',
           accelerator: 'CmdOrCtrl+Shift+C',
-          type:        'checkbox',
-          checked:     false,
-          click: (mi) => mainWindow.webContents.send('chaos:toggle', mi.checked),
+          click: () => mainWindow.webContents.send('chaos:open'),
         },
       ],
     },

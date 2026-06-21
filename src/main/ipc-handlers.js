@@ -54,8 +54,10 @@ function _buildPayload(row) {
   const cellTemp = parseFloat(row[`${type}_Tcel_C`])  || 0;
   const pReal    = parseFloat(row[`${type}_Preal_W`]) || 0;
 
-  // efficiency = fraction of peak output, expressed as %
-  const baseEff = parseFloat(((pReal / spec.peakPower) * 100).toFixed(2));
+  // pReal from CSV = expected healthy output under current weather conditions.
+  // Per-panel efficiency = actual / expected × 100%.
+  // Normal panels → 100%; chaos failures cause measured deviation below 100%.
+  const expectedPower = pReal;
 
   const panels = [];
   for (let r = 0; r < cfg.rows; r++) {
@@ -63,8 +65,8 @@ function _buildPayload(row) {
       const id      = `panel_${r}_${c}`;
       const failure = failures.get(id);
       let status    = 'normal';
-      let power     = pReal;
-      let eff       = baseEff;
+      let power     = expectedPower;
+      let eff       = 100;
       let pCellTemp = cellTemp;
 
       if (failure === 'sensor_fail') {
@@ -74,21 +76,23 @@ function _buildPayload(row) {
       } else if (failure === 'overheat') {
         status    = 'overheat';
         pCellTemp = cellTemp + 25;
-        // recalculate power with elevated cell temperature
-        const f = 1 + (-0.004) * (pCellTemp - 25);
-        power   = parseFloat((spec.peakPower * (ghi / 1000) * Math.max(0, f) * 0.8).toFixed(2));
-        eff     = parseFloat(((power / spec.peakPower) * 100).toFixed(2));
+        const f   = 1 + (-0.004) * (pCellTemp - 25);
+        power     = parseFloat((spec.peakPower * (ghi / 1000) * Math.max(0, f) * 0.8).toFixed(2));
+        eff       = expectedPower > 0
+          ? parseFloat(((power / expectedPower) * 100).toFixed(2))
+          : 0;
       } else if (failure === 'corrupted') {
         status = 'corrupted';
       }
 
       panels.push({
         id,
-        row:        r,
-        col:        c,
-        power:      parseFloat(power.toFixed(2)),
-        efficiency: parseFloat(eff.toFixed(2)),
-        cellTemp:   parseFloat(pCellTemp.toFixed(2)),
+        row:           r,
+        col:           c,
+        power:         parseFloat(power.toFixed(2)),
+        expectedPower: parseFloat(expectedPower.toFixed(2)),
+        efficiency:    parseFloat(eff.toFixed(2)),
+        cellTemp:      parseFloat(pCellTemp.toFixed(2)),
         status,
       });
     }
@@ -98,6 +102,7 @@ function _buildPayload(row) {
   const avgEff   = active.length ? active.reduce((s, p) => s + p.efficiency, 0) / active.length : 0;
   const avgCell  = active.length ? active.reduce((s, p) => s + p.cellTemp,   0) / active.length : cellTemp;
   const totalPow = active.reduce((s, p) => s + p.power, 0);
+  const totalExp = active.reduce((s, p) => s + p.expectedPower, 0);
 
   const hour = String(parseInt(row['Hora']) || 0).padStart(2, '0');
 
@@ -106,11 +111,12 @@ function _buildPayload(row) {
     speed,
     isPaused,
     globalMetrics: {
-      ghi:           parseFloat(ghi.toFixed(1)),
-      airTemp:       parseFloat(airTemp.toFixed(1)),
-      avgCellTemp:   parseFloat(avgCell.toFixed(1)),
-      avgEfficiency: parseFloat(avgEff.toFixed(1)),
-      totalPower:    parseFloat(totalPow.toFixed(1)),
+      ghi:            parseFloat(ghi.toFixed(1)),
+      airTemp:        parseFloat(airTemp.toFixed(1)),
+      avgCellTemp:    parseFloat(avgCell.toFixed(1)),
+      avgEfficiency:  parseFloat(avgEff.toFixed(1)),
+      totalPower:     parseFloat(totalPow.toFixed(1)),
+      totalExpected:  parseFloat(totalExp.toFixed(1)),
     },
     panels,
     chaosActive:   failures.size > 0,

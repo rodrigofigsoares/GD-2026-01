@@ -2,8 +2,11 @@
 
 // Requires BABYLON global (loaded via CDN before this script)
 window.AppScene = (() => {
-  let engine  = null;
-  let scene   = null;
+  let engine   = null;
+  let scene    = null;
+  let ground   = null;
+  let hemiLight = null;
+  let _isDark  = true;
   const panels = {}; // id → { mesh, mat }
 
   // ── Public API ────────────────────────────────────────
@@ -13,7 +16,7 @@ window.AppScene = (() => {
       engine.dispose();
       Object.keys(panels).forEach(k => delete panels[k]);
     }
-
+    _isDark = !document.body.classList.contains('light');
     engine = new BABYLON.Engine(canvas, true, {
       preserveDrawingBuffer: true,
       stencil: true,
@@ -21,6 +24,20 @@ window.AppScene = (() => {
     scene = _buildScene(config);
     engine.runRenderLoop(() => scene.render());
     window.addEventListener('resize', () => engine.resize());
+  }
+
+  function setTheme(isDark) {
+    _isDark = isDark;
+    if (!scene) return;
+    if (isDark) {
+      scene.clearColor         = new BABYLON.Color4(0.051, 0.067, 0.090, 1);
+      if (ground) ground.material.diffuseColor = new BABYLON.Color3(0.08, 0.10, 0.12);
+      if (hemiLight) hemiLight.groundColor     = new BABYLON.Color3(0.06, 0.07, 0.09);
+    } else {
+      scene.clearColor         = new BABYLON.Color4(0.87, 0.91, 0.95, 1);
+      if (ground) ground.material.diffuseColor = new BABYLON.Color3(0.72, 0.76, 0.80);
+      if (hemiLight) hemiLight.groundColor     = new BABYLON.Color3(0.70, 0.74, 0.78);
+    }
   }
 
   function update(payload) {
@@ -36,7 +53,9 @@ window.AppScene = (() => {
 
   function _buildScene(config) {
     const s = new BABYLON.Scene(engine);
-    s.clearColor = new BABYLON.Color4(0.051, 0.067, 0.090, 1);
+    s.clearColor = _isDark
+      ? new BABYLON.Color4(0.051, 0.067, 0.090, 1)
+      : new BABYLON.Color4(0.87, 0.91, 0.95, 1);
 
     _setupCamera(s, config);
     _setupLights(s);
@@ -64,9 +83,11 @@ window.AppScene = (() => {
   }
 
   function _setupLights(s) {
-    const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), s);
-    hemi.intensity   = 0.75;
-    hemi.groundColor = new BABYLON.Color3(0.06, 0.07, 0.09);
+    hemiLight = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), s);
+    hemiLight.intensity   = 0.75;
+    hemiLight.groundColor = _isDark
+      ? new BABYLON.Color3(0.06, 0.07, 0.09)
+      : new BABYLON.Color3(0.70, 0.74, 0.78);
 
     const dir = new BABYLON.DirectionalLight('dir', new BABYLON.Vector3(-1, -2, -1), s);
     dir.intensity = 0.40;
@@ -76,11 +97,13 @@ window.AppScene = (() => {
   function _createGround(s, config) {
     const w = (config.cols + 1) * 2.8;
     const h = (config.rows + 1) * 2.8;
-    const g = BABYLON.MeshBuilder.CreateGround('ground', { width: w, height: h }, s);
+    ground = BABYLON.MeshBuilder.CreateGround('ground', { width: w, height: h }, s);
     const m = new BABYLON.StandardMaterial('groundMat', s);
-    m.diffuseColor  = new BABYLON.Color3(0.08, 0.10, 0.12);
+    m.diffuseColor  = _isDark
+      ? new BABYLON.Color3(0.08, 0.10, 0.12)
+      : new BABYLON.Color3(0.72, 0.76, 0.80);
     m.specularColor = new BABYLON.Color3(0, 0, 0);
-    g.material = m;
+    ground.material = m;
   }
 
   function _createPanels(s, config) {
@@ -124,16 +147,14 @@ window.AppScene = (() => {
   // ── Color mapping ─────────────────────────────────────
 
   function _color(p) {
-    switch (p.status) {
-      case 'overheat':    return new BABYLON.Color3(0.88, 0.36, 0.04);
-      case 'sensor_fail': return new BABYLON.Color3(0.32, 0.36, 0.42);
-      case 'corrupted':   return new BABYLON.Color3(0.46, 0.20, 0.76);
-    }
-    if (p.efficiency <= 0)  return new BABYLON.Color3(0.06, 0.08, 0.12); // off / night
-    if (p.efficiency >= 70) return new BABYLON.Color3(0.04, 0.58, 0.32); // green
-    if (p.efficiency >= 30) return new BABYLON.Color3(0.72, 0.50, 0.04); // yellow
-    return new BABYLON.Color3(0.74, 0.17, 0.17);                          // red
+    // No per-failure-type color — software doesn't expose what the failure is.
+    // Corrupted panels have no data: show as neutral gray.
+    if (p.status === 'corrupted') return new BABYLON.Color3(0.28, 0.30, 0.34);
+    if (p.efficiency <= 0)   return new BABYLON.Color3(0.06, 0.08, 0.12); // off/night
+    if (p.efficiency >= 85)  return new BABYLON.Color3(0.04, 0.58, 0.32); // green: normal
+    if (p.efficiency >= 50)  return new BABYLON.Color3(0.72, 0.50, 0.04); // yellow: degraded
+    return new BABYLON.Color3(0.74, 0.17, 0.17);                           // red: critical
   }
 
-  return { init, update };
+  return { init, update, setTheme };
 })();
