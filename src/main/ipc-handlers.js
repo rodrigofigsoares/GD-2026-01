@@ -28,6 +28,23 @@ let _decisionSeq = 0;
 const _autoEventCooldown = new Map();
 const AUTO_COOLDOWN_TICKS = 10;
 
+let _lastPayloadDay    = null;
+let _dailyExpectedWh   = 0;
+
+// Soma o total esperado (W × 1h = Wh) para cada hora do dia informado.
+function _computeDailyExpected(day) {
+  const csvKey     = PANEL_TYPES[cfg.type]?.csvKey || cfg.type;
+  const panelCount = cfg.rows * cfg.cols;
+  const total      = count();
+  let sumWh = 0;
+  for (let i = 0; i < total; i++) {
+    const r = getRow(i);
+    if (!r || r['Data'] !== day) continue;
+    sumWh += (parseFloat(r[`${csvKey}_Preal_W`]) || 0) * panelCount;
+  }
+  return sumWh; // Wh para o dia inteiro (1 tick = 1 hora)
+}
+
 function init(mainWindow, config) {
   win      = mainWindow;
   cfg      = config;
@@ -38,6 +55,8 @@ function init(mainWindow, config) {
   decisions.length = 0;
   _decisionSeq     = 0;
   globalOverrides  = { wind: null, rh: null, tempOffset: 0, ghi: null, ghiGroup: null };
+  _lastPayloadDay  = null;
+  _dailyExpectedWh = 0;
   _autoEventCooldown.clear();
   load();
   _startLoop();
@@ -242,6 +261,13 @@ function _buildPayload(row) {
   const totalExp = active.reduce((s, p) => s + p.expectedPower, 0);
   const hourStr  = String(hour).padStart(2, '0');
 
+  // Detecta virada de dia — recalcula expected total do novo dia (à meia-noite)
+  const currentDay = row['Data'];
+  if (currentDay !== _lastPayloadDay) {
+    _lastPayloadDay  = currentDay;
+    _dailyExpectedWh = _computeDailyExpected(currentDay);
+  }
+
   return {
     timestamp: `${row['Data']}T${hourStr}:00:00`,
     speed, isPaused,
@@ -255,6 +281,7 @@ function _buildPayload(row) {
       totalPower:    parseFloat(totalPow.toFixed(1)),
       totalExpected: parseFloat(totalExp.toFixed(1)),
     },
+    dailyExpectedWh: _dailyExpectedWh,
     panels, autoEvents,
     decisions: decisions.slice(0, 50),
     chaosActive:    failures.size > 0,

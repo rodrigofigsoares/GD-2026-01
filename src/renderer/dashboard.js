@@ -13,8 +13,9 @@ window.Dashboard = (() => {
   const MAX_HIST = 24;
   const hist = { labels: [], power: [], expected: [] };
 
-  let kwhGenerated = 0;
-  let kwhExpected  = 0;
+  let kwhGenerated     = 0;
+  let _currentDay      = null;
+  let _dailyExpectedWh = 0;   // kWh para o dia atual (pré-calculado no main process)
   const CO2_FACTOR = 0.0765; // kg CO₂/kWh (fator rede elétrica brasileira)
 
   const historyItems = [];
@@ -35,8 +36,9 @@ window.Dashboard = (() => {
     hist.labels.length = 0;
     hist.power.length  = 0;
     hist.expected.length = 0;
-    kwhGenerated = 0;
-    kwhExpected  = 0;
+    kwhGenerated     = 0;
+    _currentDay      = null;
+    _dailyExpectedWh = 0;
     historyItems.length = 0;
     _prevFailureIds     = new Set();
     _lastTimeLabel      = '--:--';
@@ -65,7 +67,7 @@ window.Dashboard = (() => {
     // Energia e gráfico só avançam em ticks reais do timer,
     // não em re-emissões causadas por sliders ou IPC de controle.
     if (payload.isTimerTick) {
-      _updateEnergy(m.totalPower, m.totalExpected ?? m.totalPower);
+      _updateEnergy(m.totalPower, payload.timestamp, payload.dailyExpectedWh ?? 0);
       _pushPoint(payload.timestamp, m.totalPower, m.totalExpected ?? m.totalPower);
     }
     _updateGhiGauge(m.ghi);
@@ -351,19 +353,27 @@ window.Dashboard = (() => {
 
   // ── Energy & CO₂ ─────────────────────────────────────
 
-  function _updateEnergy(totalPower, totalExpected) {
-    // Each tick = 1 simulated hour → Wh/1000 = kWh
-    kwhGenerated += totalPower   / 1000;
-    kwhExpected  += totalExpected / 1000;
+  function _updateEnergy(totalPower, timestamp, dailyExpectedWh) {
+    const day = timestamp.slice(0, 10);
+
+    // Virada de dia (ou primeiro tick): reset e carrega expected pré-calculado
+    if (day !== _currentDay) {
+      _currentDay      = day;
+      kwhGenerated     = 0;
+      _dailyExpectedWh = (dailyExpectedWh || 0) / 1000; // Wh → kWh
+    }
+
+    // 1 tick = 1 hora simulada → W × 1h = Wh → /1000 = kWh
+    kwhGenerated += totalPower / 1000;
 
     const fmtKwh = (v) => v >= 1000
       ? `${(v / 1000).toFixed(2)} MWh`
       : `${v.toFixed(2)} kWh`;
 
     _set('energy-gen', fmtKwh(kwhGenerated));
-    _set('energy-exp', fmtKwh(kwhExpected));
+    _set('energy-exp', fmtKwh(_dailyExpectedWh));
 
-    const pct = kwhExpected > 0 ? Math.min(kwhGenerated / kwhExpected * 100, 100) : 0;
+    const pct = _dailyExpectedWh > 0 ? Math.min(kwhGenerated / _dailyExpectedWh * 100, 100) : 0;
     const bar = document.getElementById('energy-bar');
     if (bar) bar.style.width = `${pct.toFixed(1)}%`;
 
@@ -393,7 +403,7 @@ window.Dashboard = (() => {
     const r  = Math.min(w * 0.42, cy - 6);
     const SA = Math.PI;
     const EA = 2 * Math.PI;
-    const MAX = 1000;
+    const MAX = 1500;
 
     const trackColor = _isDark ? '#21262d' : '#d0d7de';
     const textColor  = _isDark ? '#e6edf3' : '#1f2328';
@@ -435,7 +445,7 @@ window.Dashboard = (() => {
     ctx.textAlign  = 'left';
     ctx.fillText('0', cx - r - 4, cy + 12);
     ctx.textAlign  = 'right';
-    ctx.fillText('1k', cx + r + 4, cy + 12);
+    ctx.fillText('1.5k', cx + r + 4, cy + 12);
   }
 
   // ── Temperature Heatmap ───────────────────────────────
@@ -530,10 +540,15 @@ window.Dashboard = (() => {
       p.efficiency >= 50
     );
 
+    // Sombra total: dia (ghi CSV > 10) mas nenhum painel produz (override ghi=0 ou bloqueio físico)
+    const allBlocked = m.ghi > 10 && panels.length > 0 &&
+      panels.every(p => p.efficiency === 0 && p.status !== 'auto_off' && p.status !== 'corrupted');
+
     const parts = [];
     if (offPanels.length  > 0) parts.push(`⛔ ${offPanels.length} desligado${offPanels.length  > 1 ? 's' : ''}`);
     if (critPanels.length > 0) parts.push(`🔴 ${critPanels.length} em falha crítica`);
     if (warnPanels.length > 0) parts.push(`⚠ ${warnPanels.length} com desempenho reduzido`);
+    if (allBlocked)            parts.push('⚠ Produção zero durante o dia');
 
     if (parts.length === 0) {
       banner.className   = 'banner-ok';
