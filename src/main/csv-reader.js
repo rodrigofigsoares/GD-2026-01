@@ -24,7 +24,7 @@ function load() {
 
 function getRow(index) {
   if (!rows) load();
-  return rows[index % rows.length] ?? null;
+  return rows[Math.floor(index) % rows.length] ?? null;
 }
 
 function count() {

@@ -67,7 +67,7 @@ window.Dashboard = (() => {
     // Energia e gráfico só avançam em ticks reais do timer,
     // não em re-emissões causadas por sliders ou IPC de controle.
     if (payload.isTimerTick) {
-      _updateEnergy(m.totalPower, payload.timestamp, payload.dailyExpectedWh ?? 0);
+      _updateEnergy(m.totalPower, payload.timestamp, payload.dailyExpectedWh ?? 0, payload.speed ?? 1);
       _pushPoint(payload.timestamp, m.totalPower, m.totalExpected ?? m.totalPower);
     }
     _updateGhiGauge(m.ghi);
@@ -118,7 +118,7 @@ window.Dashboard = (() => {
     const input  = document.getElementById('speed-input');
 
     slider?.addEventListener('input', () => {
-      const v = parseInt(slider.value, 10);
+      const v = Math.round(parseFloat(slider.value) * 100) / 100;
       if (input) input.value = v;
       currentSpeed = v;
       window.electronAPI.simulationControl('speed', v);
@@ -126,10 +126,10 @@ window.Dashboard = (() => {
     });
 
     input?.addEventListener('change', () => {
-      let v = parseInt(input.value, 10) || 1;
-      v = Math.max(1, Math.min(999, v));
+      let v = Math.round((parseFloat(input.value) || 0.1) * 100) / 100;
+      v = Math.max(0.1, Math.min(999, v));
       input.value = v;
-      if (slider) slider.value = Math.min(v, parseInt(slider.max, 10));
+      if (slider) slider.value = Math.min(v, parseFloat(slider.max));
       currentSpeed = v;
       window.electronAPI.simulationControl('speed', v);
       _syncBtns();
@@ -353,7 +353,7 @@ window.Dashboard = (() => {
 
   // ── Energy & CO₂ ─────────────────────────────────────
 
-  function _updateEnergy(totalPower, timestamp, dailyExpectedWh) {
+  function _updateEnergy(totalPower, timestamp, dailyExpectedWh, speed) {
     const day = timestamp.slice(0, 10);
 
     // Virada de dia (ou primeiro tick): reset e carrega expected pré-calculado
@@ -363,8 +363,8 @@ window.Dashboard = (() => {
       _dailyExpectedWh = (dailyExpectedWh || 0) / 1000; // Wh → kWh
     }
 
-    // 1 tick = 1 hora simulada → W × 1h = Wh → /1000 = kWh
-    kwhGenerated += totalPower / 1000;
+    // Cada tick = `speed` horas simuladas → W × speed h = Wh → /1000 = kWh
+    kwhGenerated += totalPower * (speed || 1) / 1000;
 
     const fmtKwh = (v) => v >= 1000
       ? `${(v / 1000).toFixed(2)} MWh`

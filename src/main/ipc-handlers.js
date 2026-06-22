@@ -166,11 +166,12 @@ function _buildPayload(row) {
       // expectedPower: sempre do CSV (= previsão/baseline do dia)
       const expectedPower = pReal;
 
-      // pBase: com override, recalcula potência direto da irradiância sobreposta
-      // usando a fórmula PV (GHI × Pmax/1000 × fTemp × PR).
-      // Sem override: usa o pReal do CSV (inclui calibrações NOCT reais).
+      // pBase: com override, usa condições STC (fNormal=1) — a irradiância virtual
+      // é constante, então a curva deve ser plana. Não usar cellTemp do CSV, pois
+      // ela já reflete o aquecimento do meio-dia real e causaria um dip na produção.
+      // Sem override: usa pReal do CSV (já inclui calibrações NOCT reais).
       const pBase = isGhiOverride
-        ? ghiForPanel * spec.peakPower / 1000 * fNormal * MODEL.PR
+        ? ghiForPanel * spec.peakPower / 1000 * MODEL.PR
         : pReal;
 
       let status    = 'normal';
@@ -311,7 +312,7 @@ function _buildPayload(row) {
 ipcMain.on('simulation:control', (_e, { action, value }) => {
   if (action === 'pause') { isPaused = true;  _emit(); }
   if (action === 'play')  { isPaused = false; _emit(); }
-  if (action === 'speed') { speed = Math.max(1, Math.round(value)); _emit(); }
+  if (action === 'speed') { speed = Math.max(0.1, Math.min(999, Math.round(parseFloat(value) * 100) / 100)); _emit(); }
   if (action === 'reset') { index = 0; isPaused = false; _emit(); }
   // Seek: pula para o índice (linha) correspondente à data selecionada
   if (action === 'seek')  { index = Math.max(0, Math.min(value, count() - 1)); _emit(); }
