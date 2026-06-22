@@ -255,7 +255,8 @@ function _buildPayload(row) {
         id, row: r, col: c,
         power:         parseFloat(Math.max(0, power).toFixed(2)),
         expectedPower: parseFloat(expectedPower.toFixed(2)),
-        efficiency:    parseFloat(displayEff.toFixed(2)),
+        efficiency:    parseFloat(displayEff.toFixed(2)),   // produção relativa (pode >100%)
+        health:        parseFloat(Math.min(100, effHealth).toFixed(2)), // estado físico 0-100%
         cellTemp:      parseFloat(pCellTemp.toFixed(2)),
         status:        displayStatus,
         autoOff:       autoShutdown.has(id),
@@ -263,9 +264,10 @@ function _buildPayload(row) {
     }
   }
 
-  const active   = panels.filter(p => p.status !== 'corrupted');
-  const avgEff   = active.length ? active.reduce((s, p) => s + p.efficiency, 0) / active.length : 0;
-  const avgCell  = active.length ? active.reduce((s, p) => s + p.cellTemp,   0) / active.length : cellTemp;
+  const active    = panels.filter(p => p.status !== 'corrupted');
+  const avgEff    = active.length ? active.reduce((s, p) => s + p.efficiency, 0) / active.length : 0;
+  const avgHealth = active.length ? active.reduce((s, p) => s + p.health,     0) / active.length : 0;
+  const avgCell   = active.length ? active.reduce((s, p) => s + p.cellTemp,   0) / active.length : cellTemp;
   const totalPow = active.reduce((s, p) => s + p.power, 0);
   const totalExp = active.reduce((s, p) => s + p.expectedPower, 0);
   const hourStr  = String(hour).padStart(2, '0');
@@ -290,6 +292,7 @@ function _buildPayload(row) {
       wind:          parseFloat(wind.toFixed(1)),
       avgCellTemp:   parseFloat(avgCell.toFixed(1)),
       avgEfficiency: parseFloat(avgEff.toFixed(1)),
+      avgHealth:     parseFloat(avgHealth.toFixed(1)),
       totalPower:    parseFloat(totalPow.toFixed(1)),
       totalExpected: parseFloat(totalExp.toFixed(1)),
     },

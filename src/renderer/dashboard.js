@@ -237,29 +237,26 @@ window.Dashboard = (() => {
       }
     }
 
-    const effEl = document.getElementById('sensor-eff');
+    // Saúde: estado físico 0-100% (effHealth), independente da irradiância
+    const health = m.avgHealth ?? m.avgEfficiency; // compatibilidade com versões antigas
+    const effEl  = document.getElementById('sensor-eff');
     if (effEl) {
-      effEl.textContent = `${m.avgEfficiency.toFixed(1)}%`;
-      effEl.style.color = m.ghi <= 0 ? 'var(--text-muted)'
-        : m.avgEfficiency >= 85 ? 'var(--badge-green-fg)'
-        : m.avgEfficiency >= 50 ? '#e6a817'
+      effEl.textContent = `${health.toFixed(1)}%`;
+      effEl.style.color = health >= 85 ? 'var(--badge-green-fg)'
+        : health >= 50 ? '#e6a817'
         : '#e63e3e';
     }
 
-    // Efficiency context
     const effCtx = document.getElementById('sensor-eff-ctx');
     if (effCtx) {
-      if (m.ghi <= 0) {
-        effCtx.textContent = 'Aguardando luz solar';
+      if (health >= 85) {
+        effCtx.textContent = 'Todos os painéis em bom estado';
         effCtx.style.color = '';
-      } else if (m.avgEfficiency >= 85) {
-        effCtx.textContent = 'Todos os painéis operando bem';
-        effCtx.style.color = '';
-      } else if (m.avgEfficiency >= 50) {
-        effCtx.textContent = 'Alguns painéis com desempenho reduzido';
+      } else if (health >= 50) {
+        effCtx.textContent = 'Alguns painéis com desgaste — monitorar';
         effCtx.style.color = '#e6a817';
       } else {
-        effCtx.textContent = 'Verifique os painéis — intervenção recomendada';
+        effCtx.textContent = 'Falha detectada — verifique os painéis';
         effCtx.style.color = '#f85149';
       }
     }
