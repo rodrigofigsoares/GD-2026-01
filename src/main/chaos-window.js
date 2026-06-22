@@ -29,6 +29,7 @@ function open(parent, config, activeFailures) {
     minHeight: 480,
   });
 
+  chaosWin.setMenu(null);
   chaosWin.loadFile(path.join(__dirname, '..', 'renderer', 'chaos.html'));
 
   chaosWin.webContents.on('did-finish-load', () => {

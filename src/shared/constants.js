@@ -9,8 +9,8 @@ const PANEL_TYPES = {
     peakPower: 440,
     area:      2.00,
   },
-  'MODERNO': {
-    label:     'Moderno',
+  '144CEL': {
+    label:     '144 células',
     peakPower: 682,
     area:      3.10,
   },

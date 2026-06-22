@@ -113,7 +113,7 @@ window.AppScene = (() => {
 
     for (let r = 0; r < config.rows; r++) {
       for (let c = 0; c < config.cols; c++) {
-        const id   = `panel_${r}_${c}`;
+        const id   = `panel_${r+1}_${c+1}`;
         const mesh = BABYLON.MeshBuilder.CreateBox(id, {
           width: 2.0, height: 0.08, depth: 1.4,
         }, s);

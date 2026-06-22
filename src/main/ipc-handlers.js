@@ -127,7 +127,7 @@ function _buildPayload(row) {
 
   for (let r = 0; r < cfg.rows; r++) {
     for (let c = 0; c < cfg.cols; c++) {
-      const id        = `panel_${r}_${c}`;
+      const id        = `panel_${r+1}_${c+1}`;
       const failure   = failures.get(id);
       const fType     = failure?.type     || null;
       const intensity = failure?.intensity ?? 100;
@@ -284,9 +284,10 @@ ipcMain.on('chaos:apply', (_e, { panelId, type, intensity = 100 }) => {
     failures.delete(panelId);
     // autoShutdown NÃO é limpo aqui — painel fica desligado até o operador clicar "Religar"
   } else {
+    const prevType = (failures.get(panelId) || {}).type;
     failures.set(panelId, { type, intensity: Number(intensity) });
     // Ao mudar de tipo de falha, reinicia o ciclo de auto-desligamento
-    autoShutdown.delete(panelId);
+    if (prevType !== type) autoShutdown.delete(panelId);
   }
   if (win && !win.isDestroyed())
     win.webContents.send('chaos:state-changed', { panelId, type, intensity, prev });

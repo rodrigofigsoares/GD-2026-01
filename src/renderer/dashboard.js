@@ -70,6 +70,7 @@ window.Dashboard = (() => {
     }
     _updateGhiGauge(m.ghi);
     _updateHeatmap(payload.panels);
+    _updateStatusBanner(payload.panels, m);
     _detectAlerts(payload);
     _handleAutoEvents(payload.autoEvents || []);
     _checkSuggestions(payload.panels, m);
@@ -153,39 +154,35 @@ window.Dashboard = (() => {
     if (input)  input.value  = currentSpeed;
   }
 
-  // Sincroniza o date-select com o timestamp atual da simulação
+  // Sincroniza o date-input com o timestamp atual da simulação
   function _syncSimTimestamp(payload) {
-    const sel = document.getElementById('date-select');
-    if (!sel || !sel.options.length || sel.options[0].value === '') return;
+    const inp = document.getElementById('date-input');
+    if (!inp) return;
     const simDate = payload.timestamp.slice(0, 10); // 'YYYY-MM-DD'
-    for (const opt of sel.options) {
-      if (opt.dataset.date === simDate) { sel.value = opt.value; break; }
-    }
+    if (inp.value !== simDate) inp.value = simDate;
   }
 
   async function _populateDates() {
     if (!window.electronAPI?.getDates) return;
     try {
       const dates = await window.electronAPI.getDates();
-      const sel   = document.getElementById('date-select');
-      if (!sel || !dates?.length) return;
+      const inp   = document.getElementById('date-input');
+      if (!inp || !dates?.length) return;
 
-      // Clone para remover listeners anteriores
-      const clone = sel.cloneNode(false);
-      sel.parentNode.replaceChild(clone, sel);
+      // Set min/max from available date range
+      const sorted = dates.map(d => d.date).sort();
+      inp.min = sorted[0];
+      inp.max = sorted[sorted.length - 1];
 
-      dates.forEach(d => {
-        const opt = document.createElement('option');
-        opt.value          = d.rowIndex;
-        opt.dataset.date   = d.date;
-        const [y, m, day]  = d.date.split('-');
-        opt.textContent    = `${day}/${m}/${y}`;
-        clone.appendChild(opt);
-      });
+      // Build a lookup: date string → rowIndex
+      const dateMap = {};
+      dates.forEach(d => { dateMap[d.date] = d.rowIndex; });
 
-      clone.addEventListener('change', () => {
-        const rowIndex = parseInt(clone.value, 10);
-        if (!isNaN(rowIndex)) window.electronAPI.simulationControl('seek', rowIndex);
+      const prev = inp.cloneNode(true);
+      inp.parentNode.replaceChild(prev, inp);
+      prev.addEventListener('change', () => {
+        const rowIndex = dateMap[prev.value];
+        if (rowIndex !== undefined) window.electronAPI.simulationControl('seek', rowIndex);
       });
     } catch (_) { /* getDates ainda não disponível */ }
   }
@@ -221,6 +218,23 @@ window.Dashboard = (() => {
     _set('sensor-air',  `${m.airTemp.toFixed(1)} °C`);
     _set('sensor-cell', `${m.avgCellTemp.toFixed(1)} °C`);
 
+    // Cell temp context
+    const cellCtx = document.getElementById('sensor-cell-ctx');
+    if (cellCtx) {
+      if (m.ghi <= 0) {
+        cellCtx.textContent = 'Noite — sem produção';
+      } else if (m.avgCellTemp >= 75) {
+        cellCtx.textContent = '⚠ Muito quente — risco de dano';
+        cellCtx.style.color = '#f85149';
+      } else if (m.avgCellTemp >= 55) {
+        cellCtx.textContent = 'Temperatura elevada — normal em dias quentes';
+        cellCtx.style.color = '#e6a817';
+      } else {
+        cellCtx.textContent = 'Temperatura normal';
+        cellCtx.style.color = '';
+      }
+    }
+
     const effEl = document.getElementById('sensor-eff');
     if (effEl) {
       effEl.textContent = `${m.avgEfficiency.toFixed(1)}%`;
@@ -228,6 +242,33 @@ window.Dashboard = (() => {
         : m.avgEfficiency >= 85 ? 'var(--badge-green-fg)'
         : m.avgEfficiency >= 50 ? '#e6a817'
         : '#e63e3e';
+    }
+
+    // Efficiency context
+    const effCtx = document.getElementById('sensor-eff-ctx');
+    if (effCtx) {
+      if (m.ghi <= 0) {
+        effCtx.textContent = 'Aguardando luz solar';
+        effCtx.style.color = '';
+      } else if (m.avgEfficiency >= 85) {
+        effCtx.textContent = 'Todos os painéis operando bem';
+        effCtx.style.color = '';
+      } else if (m.avgEfficiency >= 50) {
+        effCtx.textContent = 'Alguns painéis com desempenho reduzido';
+        effCtx.style.color = '#e6a817';
+      } else {
+        effCtx.textContent = 'Verifique os painéis — intervenção recomendada';
+        effCtx.style.color = '#f85149';
+      }
+    }
+
+    // "Produzindo agora"
+    const nowPow = document.getElementById('now-power');
+    if (nowPow) {
+      const w = m.totalPower;
+      nowPow.textContent = m.ghi <= 0 ? '0 W'
+        : w >= 1000 ? `${(w / 1000).toFixed(2)} kW`
+        : `${w.toFixed(0)} W`;
     }
   }
 
@@ -471,6 +512,31 @@ window.Dashboard = (() => {
     ctx.fillText(`${MIN_T}°`, lgX - 2, h - 2);
   }
 
+  // ── Status Banner (3D viewport overlay) ──────────
+
+  function _updateStatusBanner(panels, m) {
+    const banner = document.getElementById('status-banner');
+    if (!banner) return;
+
+    const hasAutoOff   = panels.some(p => p.status === 'auto_off');
+    const lowEffPanels = panels.filter(p => p.efficiency < 60 && p.efficiency > 0 && p.status !== 'corrupted');
+    const allOk        = panels.every(p => p.status === 'normal' || p.efficiency === 0);
+
+    if (hasAutoOff) {
+      banner.className   = 'banner-critical';
+      banner.textContent = `⛔ ${panels.filter(p => p.status === 'auto_off').length} painel(is) desligado(s) — verifique o sistema`;
+    } else if (lowEffPanels.length > 0) {
+      banner.className   = 'banner-warning';
+      banner.textContent = `⚠ ${lowEffPanels.length} painel(is) com eficiência baixa`;
+    } else if (m.ghi <= 0) {
+      banner.className   = 'banner-ok';
+      banner.textContent = '🌙 Período noturno — aguardando luz solar';
+    } else {
+      banner.className   = 'banner-ok';
+      banner.textContent = '✅ Sistema operando normalmente';
+    }
+  }
+
   // ── Alert Feed ────────────────────────────────────────
 
   // ── Histórico de Eventos (sidebar esquerda) ──────────
@@ -539,10 +605,15 @@ window.Dashboard = (() => {
       if (_prevFailureIds.has(key)) return;
       const [panelId, type] = key.split(':');
       if (type === 'auto_off') {
-        _addHistory('⛔', panelId, 'Desconectado pelo sistema por temperatura crítica.', _lastTimeLabel, 'critical', panelId);
+        _addHistory('⛔', `Painel ${panelId} desligado`,
+          'Desligado automaticamente por temperatura crítica. Clique em "Religar" após a temperatura normalizar.',
+          _lastTimeLabel, 'critical', panelId);
       } else if (type === 'low_eff') {
         const p = payload.panels.find(x => x.id === panelId);
-        _addHistory('⚠', panelId, `Eficiência anormal: ${p?.efficiency.toFixed(0) ?? '?'}% do esperado.`, _lastTimeLabel, 'warning', null);
+        const pct = p?.efficiency.toFixed(0) ?? '?';
+        _addHistory('⚠', `Painel ${panelId} com baixa produção`,
+          `Produzindo ${pct}% do esperado. Verifique se há sombra, sujeira ou dano neste painel.`,
+          _lastTimeLabel, 'warning', null);
       }
     });
 
@@ -550,8 +621,11 @@ window.Dashboard = (() => {
     _prevFailureIds.forEach(key => {
       if (currentKeys.has(key)) return;
       const [panelId, type] = key.split(':');
-      const detail = type === 'auto_off' ? 'Painel reativado pelo operador.' : 'Eficiência normalizada.';
-      _addHistory('✅', panelId, detail, _lastTimeLabel, 'ok', null);
+      if (type === 'auto_off') {
+        _addHistory('✅', `Painel ${panelId} reativado`, 'Painel religado pelo operador. Monitorar nas próximas horas.', _lastTimeLabel, 'ok', null);
+      } else {
+        _addHistory('✅', `Painel ${panelId} normalizado`, 'Produção voltou ao normal. Nenhuma ação necessária.', _lastTimeLabel, 'ok', null);
+      }
     });
 
     _prevFailureIds = currentKeys;
@@ -677,17 +751,23 @@ window.Dashboard = (() => {
   // ── Toast Notifications ───────────────────────────────
 
   const _toastCooldown = new Map();  // key → last-shown ms
-  const TOAST_COOLDOWN_MS = 2_000;   // 2s entre toasts do mesmo tipo (aumentar na versão comercial)
+  const TOAST_COOLDOWN_MS = 5_000;   // 5s entre toasts do mesmo tipo (aumentar na versão comercial)
   const _chaosToastCooldown = new Map();
   let _suggestionCooldown = 0;
 
   const TOAST_MESSAGES = {
-    overheat_warning:  { icon: '🌡', sev: 'warning',  title: 'Atenção — Temperatura',    body: (v) => `Temperatura de célula em ${v}°C. Derating aplicado.` },
-    overheat_critical: { icon: '🔥', sev: 'critical', title: 'Crítico — Superaquecimento',body: (v) => `Temperatura de célula em ${v}°C. Risco de dano permanente.` },
-    wind_warning:      { icon: '💨', sev: 'warning',  title: 'Atenção — Vento',           body: (v) => `Velocidade de ${v} m/s detectada. Monitorar fixação.` },
-    wind_critical:     { icon: '🌪', sev: 'critical', title: 'Crítico — Vento Forte',     body: (v) => `Velocidade de ${v} m/s! Risco estrutural.` },
-    humidity:          { icon: '💧', sev: 'warning',  title: 'Atenção — Umidade Alta',    body: (v) => `Umidade em ${v}%. Verificar vedação dos conectores.` },
-    panel_shutdown:    { icon: '⛔', sev: 'critical', title: 'Sistema — Painel Desligado', body: (e) => `${e.panelId} desconectado automaticamente por superaquecimento (${e.reason}).` },
+    overheat_warning:  { icon: '🌡', sev: 'warning',  title: 'Temperatura elevada',
+      body: (v) => `Células a ${v}°C. Verifique se há sombra ou sujeira nos painéis que possam estar concentrando calor.` },
+    overheat_critical: { icon: '🔥', sev: 'critical', title: 'Superaquecimento crítico',
+      body: (v) => `Células a ${v}°C — risco de dano. O sistema pode desligar painéis automaticamente. Contate um técnico.` },
+    wind_warning:      { icon: '💨', sev: 'warning',  title: 'Vento forte detectado',
+      body: (v) => `${v} m/s. Verifique a fixação dos painéis após o evento de vento.` },
+    wind_critical:     { icon: '🌪', sev: 'critical', title: 'Vento — risco estrutural',
+      body: (v) => `${v} m/s! Verifique os painéis e suportes assim que for seguro. Chame um técnico se encontrar danos.` },
+    humidity:          { icon: '💧', sev: 'warning',  title: 'Umidade muito alta',
+      body: (v) => `Umidade em ${v}%. Após chuva ou neblina intensa, verifique se há água nos conectores dos painéis.` },
+    panel_shutdown:    { icon: '⛔', sev: 'critical', title: 'Painel desligado automaticamente',
+      body: (e) => `${e.panelId} foi desligado pelo sistema por superaquecimento. Use o botão "Religar" no histórico após a temperatura normalizar.` },
   };
 
   function _makeToast(container, sev, icon, title, body, lifetime) {
@@ -758,41 +838,19 @@ window.Dashboard = (() => {
 
   function onChaosChange(data) {
     if (!data) return;
+    // Apenas o evento de "religar" (feito pelo operador) gera notificação visível.
+    // Injeção/remoção de falhas via Chaos Mode é ferramenta de dev — invisível ao operador.
+    if (data.type !== 'reinstate') return;
+
     const container = document.getElementById('toast-container');
     if (!container) return;
 
-    // Cooldown de 2s por chave para não disparar múltiplos toasts ao arrastar slider
-    const ckKey = `chaos_${data.type}_${data.panelId || ''}`;
+    const ckKey = `chaos_reinstate_${data.panelId || ''}`;
     const now   = Date.now();
     if (_chaosToastCooldown.has(ckKey) && now - _chaosToastCooldown.get(ckKey) < TOAST_COOLDOWN_MS) return;
     _chaosToastCooldown.set(ckKey, now);
 
-    const TYPE_LABELS = {
-      overheat: 'Superaquecimento', hotspot: 'Hot-Spot', pid: 'Degradação PID',
-      string_fail: 'Falha de String', bypass_fail: 'Falha de Bypass',
-      soiling: 'Sujeira', sensor_fail: 'Falha de Sensor', corrupted: 'Dado Corrompido',
-    };
-
-    if (data.type === 'clear_all') {
-      _makeToast(container, 'info', '🗑', 'Chaos Mode', 'Todas as falhas foram removidas.', 5000);
-      return;
-    }
-    if (data.type === 'reinstate') {
-      _makeToast(container, 'info', '🔌', 'Painel Religado', `${data.panelId} foi reativado pelo operador.`, 5000);
-      return;
-    }
-    if (!data.type || data.type === 'clear') {
-      _makeToast(container, 'info', '✅', 'Falha Removida', `${data.panelId} — normalizado.`, 5000);
-      return;
-    }
-
-    const label     = TYPE_LABELS[data.type] || data.type;
-    const isChange  = data.prev && data.prev.type === data.type;
-    const title     = isChange ? 'Intensidade Alterada' : 'Falha Injetada';
-    const bodyText  = isChange
-      ? `${data.panelId} — ${label} (${data.prev.intensity}% → ${data.intensity}%)`
-      : `${data.panelId} — ${label} (${data.intensity}%)`;
-    _makeToast(container, 'warning', '⚡', title, bodyText, 6000);
+    _makeToast(container, 'info', '🔌', 'Painel religado', `${data.panelId} foi reativado. Monitorar nas próximas horas.`, 5000);
   }
 
   function _handleAutoEvents(autoEvents) {
@@ -827,15 +885,8 @@ window.Dashboard = (() => {
     const cause  = _suggestionCauses[status] || 'problema desconhecido';
     _suggestionCooldown = Date.now();
 
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-
-    const toast = document.createElement('div');
-    toast.className = 'toast toast-info';
-    toast.innerHTML = `<span class="toast-icon">🔍</span><div><div class="toast-title">Já verificou seus painéis recentemente?</div><div class="toast-body">${yellowPanels.length} painel(is) com eficiência reduzida — pode ser ${cause}.</div></div><button class="toast-close">✕</button>`;
-    toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
-    container.appendChild(toast);
-    setTimeout(() => { toast.classList.add('toast-out'); setTimeout(() => toast.remove(), 400); }, 9000);
+    const detail = `${yellowPanels.length} painel(is) com eficiência reduzida — pode ser ${cause}. Uma limpeza ou inspeção visual pode resolver.`;
+    _addHistory('🔍', 'Já verificou seus painéis?', detail, _lastTimeLabel, 'info', null);
   }
 
   return { init, update, updateChartLabel, updateTheme, syncControls, onChaosChange };

@@ -379,11 +379,11 @@
     for (let r = 0; r < config.rows; r++) {
       const hdr = document.createElement('div');
       hdr.className   = 'section-hdr';
-      hdr.textContent = `Linha ${r}`;
+      hdr.textContent = `Linha ${r + 1}`;
       list.appendChild(hdr);
 
       for (let c = 0; c < config.cols; c++) {
-        const id  = `panel_${r}_${c}`;
+        const id  = `panel_${r+1}_${c+1}`;
         const row = _makeRow(id);
         list.appendChild(row);
       }
@@ -401,7 +401,7 @@
     grid.innerHTML = '';
     for (let r = 0; r < config.rows; r++) {
       for (let c = 0; c < config.cols; c++) {
-        const id = `panel_${r}_${c}`;
+        const id = `panel_${r+1}_${c+1}`;
         const label = document.createElement('label');
         label.className = 'group-check';
         label.dataset.id = id;
