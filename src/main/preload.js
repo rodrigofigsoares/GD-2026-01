@@ -1,32 +1,33 @@
+'use strict';
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Config
   submitConfig: (config) => ipcRenderer.send('config:submit', config),
   getConfig:    ()       => ipcRenderer.invoke('config:get'),
 
-  // Menu → renderer
   onOpenSettings: (cb) => {
     ipcRenderer.removeAllListeners('settings:open');
     ipcRenderer.on('settings:open', () => cb());
   },
-  onChaosOpen: (cb) => {
-    ipcRenderer.removeAllListeners('chaos:open');
-    ipcRenderer.on('chaos:open', () => cb());
-  },
 
-  // Simulation data → renderer
   onSimulationTick: (cb) => {
     ipcRenderer.removeAllListeners('simulation:tick');
     ipcRenderer.on('simulation:tick', (_e, payload) => cb(payload));
   },
 
-  // Simulation controls → main
   simulationControl: (action, value) =>
     ipcRenderer.send('simulation:control', { action, value }),
 
-  // Chaos Mode → main
-  chaosApply:    (panelId, failure) =>
-    ipcRenderer.send('chaos:apply', { panelId, failure }),
+  getDates: () => ipcRenderer.invoke('sim:get-dates'),
+
+  chaosApply:    (panelId, type, intensity = 100) =>
+    ipcRenderer.send('chaos:apply', { panelId, type, intensity }),
   chaosClearAll: () => ipcRenderer.send('chaos:clear_all'),
+
+  reinstatePanel: (panelId) => ipcRenderer.send('reinstate:panel', { panelId }),
+
+  onChaosStateChanged: (cb) => {
+    ipcRenderer.removeAllListeners('chaos:state-changed');
+    ipcRenderer.on('chaos:state-changed', (_e, data) => cb(data));
+  },
 });

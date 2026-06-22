@@ -1,24 +1,44 @@
+'use strict';
 const { ipcMain } = require('electron');
-const { load, getRow, count } = require('./csv-reader');
-const { PANEL_TYPES, SIMULATION } = require('../shared/constants');
+const { load, getRow, count, getDates } = require('./csv-reader');
+const { PANEL_TYPES, MODEL, SIMULATION, FAULT_THRESHOLDS } = require('../shared/constants');
 
-let win       = null;
-let cfg       = null;
-let timer     = null;
-let index     = 0;
-let speed     = 1;
-let isPaused  = false;
-const failures = new Map(); // panelId → 'overheat' | 'sensor_fail' | 'corrupted'
+let win          = null;
+let cfg          = null;
+let timer        = null;
+let index        = 0;
+let speed        = 1;
+let isPaused     = false;
+let _extraTarget = null;
 
-// ── Public API ────────────────────────────────────────────────────
+// failures: Map<panelId, { type, intensity }>
+const failures        = new Map();
+const autoShutdown    = new Set();
+// Último estado diurno de cada painel — persiste à noite para que sombra/falha
+// do dia não desapareça só porque o sol baixou.
+const lastDaytimeState = new Map(); // panelId → { eff, status }
+
+// globalOverrides: nulls = use CSV value
+let globalOverrides = { wind: null, rh: null, tempOffset: 0, ghi: null, ghiGroup: null };
+
+// autonomous decisions log
+const decisions  = [];
+let _decisionSeq = 0;
+
+const _autoEventCooldown = new Map();
+const AUTO_COOLDOWN_TICKS = 10;
 
 function init(mainWindow, config) {
   win      = mainWindow;
   cfg      = config;
-  index    = 0;
-  speed    = 1;
-  isPaused = false;
+  index    = 0; speed = 1; isPaused = false;
   failures.clear();
+  autoShutdown.clear();
+  lastDaytimeState.clear();
+  decisions.length = 0;
+  _decisionSeq     = 0;
+  globalOverrides  = { wind: null, rh: null, tempOffset: 0, ghi: null, ghiGroup: null };
+  _autoEventCooldown.clear();
   load();
   _startLoop();
 }
@@ -27,73 +47,189 @@ function stop() {
   if (timer) { clearInterval(timer); timer = null; }
 }
 
-// ── Internal ──────────────────────────────────────────────────────
+function setExtraTarget(fn) { _extraTarget = fn; }
 
 function _startLoop() {
   stop();
-  _tick();
+  _emit();
   timer = setInterval(_tick, SIMULATION.TICK_INTERVAL_MS);
 }
 
-function _tick() {
-  if (isPaused || !win || !cfg) return;
-
+// _emit: re-renderiza o tick atual SEM avançar o índice.
+// isTimerTick=false → chamado por ações IPC (sliders, chaos); o renderer
+// ignora acumulação de energia e adição de ponto no gráfico nesses casos.
+function _emit(isTimerTick = false) {
+  if (!win || !cfg) return;
   const row = getRow(index);
   if (!row) return;
+  const payload = { ..._buildPayload(row), isTimerTick };
+  win.webContents.send('simulation:tick', payload);
+  if (_extraTarget) _extraTarget(payload);
+}
 
-  win.webContents.send('simulation:tick', _buildPayload(row));
+// _tick: chamado pelo timer — emite como tick real e avança o tempo da simulação
+function _tick() {
+  if (isPaused) return;
+  _emit(true); // isTimerTick = true
   index = (index + speed) % count();
+}
+
+function _addDecision(ts, panelId, type, reason) {
+  decisions.unshift({ seq: ++_decisionSeq, ts, panelId, type, reason, reverted: false });
+  if (decisions.length > 100) decisions.pop();
 }
 
 function _buildPayload(row) {
   const type = cfg.type;
   const spec = PANEL_TYPES[type];
+  const { GAMMA, T_REF } = MODEL;
+  const FT = FAULT_THRESHOLDS;
 
-  const ghi      = parseFloat(row['GHI_Wh_m2'])      || 0;
-  const airTemp  = parseFloat(row['T2M_C'])            || 0;
-  const cellTemp = parseFloat(row[`${type}_Tcel_C`])  || 0;
-  const pReal    = parseFloat(row[`${type}_Preal_W`]) || 0;
+  const ghi      = parseFloat(row['GHI_Wh_m2'])       || 0;
+  const rawAir   = parseFloat(row['T2M_C'])             || 0;
+  const airTemp  = rawAir + (globalOverrides.tempOffset || 0);
+  const cellTemp = parseFloat(row[`${type}_Tcel_C`])   || 0;
+  const pReal    = parseFloat(row[`${type}_Preal_W`])  || 0;
+  const wind     = globalOverrides.wind !== null ? globalOverrides.wind : (parseFloat(row['WS10M_ms']) || 0);
+  const rh       = globalOverrides.rh   !== null ? globalOverrides.rh  : (parseFloat(row['RH2M_pct']) || 0);
+  const hour     = parseInt(row['Hora']) || 0;
+  const isDaytime = hour >= 6 && hour <= 18 && ghi > 10;
 
-  // pReal from CSV = expected healthy output under current weather conditions.
-  // Per-panel efficiency = actual / expected × 100%.
-  // Normal panels → 100%; chaos failures cause measured deviation below 100%.
-  const expectedPower = pReal;
+  // Thermal factor at current (possibly offset) air-driven cell temp
+  const fNormal = Math.max(0.01, 1 + GAMMA * (cellTemp - T_REF));
 
+  // ── Auto-detection events ──────────────────────────────────────
+  const autoEvents = [];
+
+  function _pushAuto(key, event) {
+    const last = _autoEventCooldown.get(key) ?? -Infinity;
+    if (index - last >= AUTO_COOLDOWN_TICKS) {
+      _autoEventCooldown.set(key, index);
+      autoEvents.push(event);
+    }
+  }
+
+  if (isDaytime) {
+    if (cellTemp >= FT.CELL_TEMP_CRITICAL)
+      _pushAuto('cell_critical', { type: 'overheat_critical', severity: 'critical', value: cellTemp.toFixed(1) });
+    else if (cellTemp >= FT.CELL_TEMP_WARNING)
+      _pushAuto('cell_warning',  { type: 'overheat_warning',  severity: 'warning',  value: cellTemp.toFixed(1) });
+  }
+  if (wind >= FT.WIND_CRITICAL)
+    _pushAuto('wind_critical', { type: 'wind_critical', severity: 'critical', value: wind.toFixed(1) });
+  else if (wind >= FT.WIND_WARNING)
+    _pushAuto('wind_warning',  { type: 'wind_warning',  severity: 'warning',  value: wind.toFixed(1) });
+  if (rh >= FT.RH_WARNING)
+    _pushAuto('humidity', { type: 'humidity', severity: 'warning', value: rh.toFixed(0) });
+
+  // ── Per-panel simulation ───────────────────────────────────────
   const panels = [];
+
   for (let r = 0; r < cfg.rows; r++) {
     for (let c = 0; c < cfg.cols; c++) {
-      const id      = `panel_${r}_${c}`;
-      const failure = failures.get(id);
+      const id        = `panel_${r}_${c}`;
+      const failure   = failures.get(id);
+      const fType     = failure?.type     || null;
+      const intensity = failure?.intensity ?? 100;
+
+      // GHI override: só afeta power (actual), NÃO expectedPower (= previsão CSV)
+      const inGhiGroup  = globalOverrides.ghiGroup === null || globalOverrides.ghiGroup.has(id);
+      const ghiForPanel = (globalOverrides.ghi !== null && inGhiGroup) ? globalOverrides.ghi : ghi;
+      // ghiRatio: quanto de luz o painel recebe vs. baseline do CSV
+      //   < 1 → sombra / nuvem   |   > 1 → dia atipicamente ensolarado
+      //   = 1 → sem override (ou noite — evita divisão por zero)
+      const ghiRatio = ghi > 0 ? ghiForPanel / ghi : 1;
+
+      // expectedPower: sempre do CSV (= previsão/baseline do dia)
+      // Na versão comercial, virá de uma API de previsão do tempo.
+      const expectedPower = pReal;
+
       let status    = 'normal';
-      let power     = expectedPower;
-      let eff       = 100;
+      let effHealth = 100; // saúde derivada da falha (100 = sem falha)
       let pCellTemp = cellTemp;
 
-      if (failure === 'sensor_fail') {
-        status = 'sensor_fail';
-        power  = 0;
-        eff    = 0;
-      } else if (failure === 'overheat') {
-        status    = 'overheat';
-        pCellTemp = cellTemp + 25;
-        const f   = 1 + (-0.004) * (pCellTemp - 25);
-        power     = parseFloat((spec.peakPower * (ghi / 1000) * Math.max(0, f) * 0.8).toFixed(2));
-        eff       = expectedPower > 0
-          ? parseFloat(((power / expectedPower) * 100).toFixed(2))
-          : 0;
-      } else if (failure === 'corrupted') {
-        status = 'corrupted';
+      // ── Lógica de falha (Chaos Mode) — define effHealth ────────
+      if (fType === 'overheat') {
+        status = 'overheat';
+        const extraDeg    = (intensity / 100) * 60;
+        pCellTemp         = cellTemp + extraDeg;
+        const fHot        = Math.max(0, 1 + GAMMA * (pCellTemp - T_REF));
+        const thermalRatio = fHot / fNormal;
+        const degradFactor = 1 - (intensity / 100) * 0.35;
+        effHealth = Math.max(0, thermalRatio * degradFactor * 100);
+
+        if (pCellTemp >= FT.CELL_TEMP_SHUTDOWN && !autoShutdown.has(id)) {
+          autoShutdown.add(id);
+          const simTs = `${row['Data']}T${String(hour).padStart(2,'0')}:00:00`;
+          _addDecision(simTs, id, 'panel_shutdown', `Tcél ${pCellTemp.toFixed(0)}°C ≥ ${FT.CELL_TEMP_SHUTDOWN}°C`);
+          _pushAuto(`shutdown_${id}`, { type: 'panel_shutdown', severity: 'critical', panelId: id });
+        }
+
+      } else if (fType === 'hotspot') {
+        status    = 'hotspot';
+        pCellTemp = cellTemp + (intensity / 100) * 25;
+        effHealth = Math.max(5, (1 - (intensity / 100) * 0.55) * 100);
+
+      } else if (fType === 'pid') {
+        status    = 'pid';
+        effHealth = (1 - (intensity / 100) * 0.30) * 100;
+
+      } else if (fType === 'string_fail') {
+        status = 'string_fail'; effHealth = 0;
+
+      } else if (fType === 'bypass_fail') {
+        status    = 'bypass_fail';
+        pCellTemp = cellTemp + (intensity / 100) * 20;
+        effHealth = (1 - (0.10 + (intensity / 100) * 0.40)) * 100;
+
+      } else if (fType === 'soiling') {
+        status    = 'soiling';
+        effHealth = (1 - (intensity / 100) * 0.30) * 100;
+
+      } else if (fType === 'sensor_fail') {
+        status = 'sensor_fail'; effHealth = 0;
+
+      } else if (fType === 'corrupted') {
+        status = 'corrupted'; // UI mostrará N/A
+      }
+
+      // ── Desligamento automático (decisão do gêmeo) ─────────────
+      // Sobrescreve tudo — painel fica vermelho/off até reinstate explícito do operador
+      if (autoShutdown.has(id)) {
+        status    = 'auto_off';
+        effHealth = 0;
+      }
+
+      // ── Eficiência final: saúde × irradiância relativa ─────────
+      const eff   = effHealth * ghiRatio;
+      // power: naturalmente 0 à noite pois expectedPower=0
+      const power = expectedPower * (eff / 100);
+
+      // ── Persistência noturna de anomalia ───────────────────────
+      // Problema durante o dia não some só porque o sol baixou.
+      // Ex: sombra de árvore → painel continua marcado até o próximo dia de sol.
+      let displayEff    = eff;
+      let displayStatus = status;
+
+      if (isDaytime) {
+        lastDaytimeState.set(id, { eff, status });
+      } else {
+        const last = lastDaytimeState.get(id);
+        // Só herda se o painel parecia saudável agora mas estava com problema durante o dia
+        if (last && last.eff < 85 && displayStatus === 'normal') {
+          displayEff    = last.eff;
+          displayStatus = last.status;
+        }
       }
 
       panels.push({
-        id,
-        row:           r,
-        col:           c,
-        power:         parseFloat(power.toFixed(2)),
+        id, row: r, col: c,
+        power:         parseFloat(Math.max(0, power).toFixed(2)),
         expectedPower: parseFloat(expectedPower.toFixed(2)),
-        efficiency:    parseFloat(eff.toFixed(2)),
+        efficiency:    parseFloat(displayEff.toFixed(2)),
         cellTemp:      parseFloat(pCellTemp.toFixed(2)),
-        status,
+        status:        displayStatus,
+        autoOff:       autoShutdown.has(id),
       });
     }
   }
@@ -103,45 +239,94 @@ function _buildPayload(row) {
   const avgCell  = active.length ? active.reduce((s, p) => s + p.cellTemp,   0) / active.length : cellTemp;
   const totalPow = active.reduce((s, p) => s + p.power, 0);
   const totalExp = active.reduce((s, p) => s + p.expectedPower, 0);
-
-  const hour = String(parseInt(row['Hora']) || 0).padStart(2, '0');
+  const hourStr  = String(hour).padStart(2, '0');
 
   return {
-    timestamp: `${row['Data']}T${hour}:00:00`,
-    speed,
-    isPaused,
+    timestamp: `${row['Data']}T${hourStr}:00:00`,
+    speed, isPaused,
     globalMetrics: {
-      ghi:            parseFloat(ghi.toFixed(1)),
-      airTemp:        parseFloat(airTemp.toFixed(1)),
-      avgCellTemp:    parseFloat(avgCell.toFixed(1)),
-      avgEfficiency:  parseFloat(avgEff.toFixed(1)),
-      totalPower:     parseFloat(totalPow.toFixed(1)),
-      totalExpected:  parseFloat(totalExp.toFixed(1)),
+      ghi:           parseFloat(ghi.toFixed(1)),
+      airTemp:       parseFloat(airTemp.toFixed(1)),
+      rh:            parseFloat(rh.toFixed(1)),
+      wind:          parseFloat(wind.toFixed(1)),
+      avgCellTemp:   parseFloat(avgCell.toFixed(1)),
+      avgEfficiency: parseFloat(avgEff.toFixed(1)),
+      totalPower:    parseFloat(totalPow.toFixed(1)),
+      totalExpected: parseFloat(totalExp.toFixed(1)),
     },
-    panels,
-    chaosActive:   failures.size > 0,
-    activeFailures: [...failures.entries()].map(([id, s]) => `${id}:${s}`),
+    panels, autoEvents,
+    decisions: decisions.slice(0, 50),
+    chaosActive:    failures.size > 0,
+    activeFailures: [...failures.entries()].map(([id, f]) => ({ id, type: f.type, intensity: f.intensity })),
+    globalOverrides: {
+      wind: globalOverrides.wind, rh: globalOverrides.rh,
+      tempOffset: globalOverrides.tempOffset,
+      ghi: globalOverrides.ghi,
+      ghiGroup: globalOverrides.ghiGroup ? [...globalOverrides.ghiGroup] : null,
+    },
   };
 }
 
-// ── IPC handlers (registered once at module load) ─────────────────
+// ── IPC handlers ──────────────────────────────────────────────────
 
 ipcMain.on('simulation:control', (_e, { action, value }) => {
-  if (action === 'pause') { isPaused = true; }
-  if (action === 'play')  { isPaused = false; _tick(); }
-  if (action === 'speed') { speed = value; if (!isPaused) _tick(); }
-  if (action === 'reset') { index = 0; isPaused = false; _tick(); }
+  if (action === 'pause') { isPaused = true;  _emit(); }
+  if (action === 'play')  { isPaused = false; _emit(); }
+  if (action === 'speed') { speed = Math.max(1, Math.round(value)); _emit(); }
+  if (action === 'reset') { index = 0; isPaused = false; _emit(); }
+  // Seek: pula para o índice (linha) correspondente à data selecionada
+  if (action === 'seek')  { index = Math.max(0, Math.min(value, count() - 1)); _emit(); }
 });
 
-ipcMain.on('chaos:apply', (_e, { panelId, failure }) => {
-  if (failure === 'clear') failures.delete(panelId);
-  else failures.set(panelId, failure);
-  if (!isPaused) _tick();
+ipcMain.on('chaos:apply', (_e, { panelId, type, intensity = 100 }) => {
+  const prev = failures.get(panelId) || null;
+  if (!type || type === 'clear') {
+    failures.delete(panelId);
+    // autoShutdown NÃO é limpo aqui — painel fica desligado até o operador clicar "Religar"
+  } else {
+    failures.set(panelId, { type, intensity: Number(intensity) });
+    // Ao mudar de tipo de falha, reinicia o ciclo de auto-desligamento
+    autoShutdown.delete(panelId);
+  }
+  if (win && !win.isDestroyed())
+    win.webContents.send('chaos:state-changed', { panelId, type, intensity, prev });
+  _emit(); // re-renderiza sem avançar o tempo
 });
 
 ipcMain.on('chaos:clear_all', () => {
   failures.clear();
-  if (!isPaused) _tick();
+  autoShutdown.clear();
+  lastDaytimeState.clear(); // reseta persistência noturna junto com tudo
+  globalOverrides = { wind: null, rh: null, tempOffset: 0, ghi: null, ghiGroup: null };
+  if (win && !win.isDestroyed())
+    win.webContents.send('chaos:state-changed', { type: 'clear_all' });
+  _emit();
 });
 
-module.exports = { init, stop };
+ipcMain.on('chaos:global', (_e, overrides) => {
+  const copy = { ...overrides };
+  if ('ghiGroup' in copy) {
+    globalOverrides.ghiGroup = copy.ghiGroup && copy.ghiGroup.length > 0
+      ? new Set(copy.ghiGroup) : null;
+    delete copy.ghiGroup;
+  }
+  globalOverrides = { ...globalOverrides, ...copy };
+  _emit(); // re-renderiza sem avançar o tempo
+});
+
+ipcMain.on('reinstate:panel', (_e, { panelId }) => {
+  autoShutdown.delete(panelId);
+  lastDaytimeState.delete(panelId); // painel religado → não herda mais o estado de desligamento
+  const d = decisions.find(d => !d.reverted && d.panelId === panelId && d.type === 'panel_shutdown');
+  if (d) d.reverted = true;
+  if (win && !win.isDestroyed())
+    win.webContents.send('chaos:state-changed', { type: 'reinstate', panelId });
+  _emit();
+});
+
+ipcMain.handle('sim:get-dates', () => {
+  load(); // garante que o CSV está carregado
+  return getDates();
+});
+
+module.exports = { init, stop, setExtraTarget };

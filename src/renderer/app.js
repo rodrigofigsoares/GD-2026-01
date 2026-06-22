@@ -5,11 +5,6 @@ window.electronAPI.onSimulationTick((payload) => {
   window.AppScene?.update(payload);
   window.Dashboard?.update(payload);
   window.updateTrackedTooltip?.(payload.panels);
-  window._updateChaosState?.(payload.activeFailures);
-});
-
-window.electronAPI.onChaosOpen(() => {
-  window.openChaosModal?.();
 });
 
 let _statusRevealed = false;

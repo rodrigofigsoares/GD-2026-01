@@ -166,7 +166,7 @@
     }
 
     /* ── Simulation Controls ─────────────────────────── */
-    .ctrl-row { display: flex; gap: 8px; }
+    .ctrl-row { display: flex; gap: 8px; align-items: center; }
     .btn-ctrl {
       width: 40px; height: 34px; background: var(--ph-bg);
       border: 1px solid var(--border2); border-radius: 6px; color: var(--text-dim);
@@ -176,28 +176,74 @@
     }
     .btn-ctrl:hover  { background: var(--border2); color: var(--text); }
     .btn-ctrl.active { color: var(--text-bright); border-color: var(--accent); }
-    .btn-speed {
-      flex: 1; height: 34px; background: var(--ph-bg);
-      border: 1px solid var(--border2); border-radius: 6px; color: var(--text-dim);
-      font-size: 0.85rem; font-weight: 700; font-family: inherit; cursor: pointer;
-      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    .ctrl-status-label { font-size: 0.72rem; color: var(--badge-green-fg); }
+    .ctrl-field { margin-top: 10px; }
+    .ctrl-label {
+      font-size: 0.66rem; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.07em;
+      display: block; margin-bottom: 4px;
     }
-    .btn-speed:hover  { background: var(--border2); color: var(--text); }
-    .btn-speed.active { color: var(--badge-green-fg); border-color: var(--accent); }
+    .ctrl-speed-row { display: flex; align-items: center; gap: 5px; }
+    .ctrl-slider { flex: 1; height: 4px; accent-color: var(--accent); cursor: pointer; min-width: 0; }
+    .ctrl-num-input {
+      width: 42px; background: var(--input-bg); border: 1px solid var(--border2);
+      border-radius: 4px; color: var(--text-bright); padding: 3px 5px;
+      font-size: 0.78rem; font-family: inherit; text-align: right; outline: none;
+      -moz-appearance: textfield;
+    }
+    .ctrl-num-input::-webkit-outer-spin-button,
+    .ctrl-num-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .ctrl-num-input:focus { border-color: var(--badge-blue-fg); }
+    .ctrl-unit { font-size: 0.68rem; color: var(--text-muted); white-space: nowrap; }
+    .ctrl-select {
+      width: 100%; background: var(--input-bg); border: 1px solid var(--border2);
+      border-radius: 4px; color: var(--text-bright); padding: 4px 6px;
+      font-size: 0.75rem; font-family: inherit; outline: none; cursor: pointer;
+      appearance: none;
+    }
+    .ctrl-select:focus { border-color: var(--badge-blue-fg); }
 
-    /* ── Alert Feed ──────────────────────────────────── */
+    /* ── Histórico de Eventos ────────────────────────── */
     .alerts-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
     #alert-list {
-      overflow-y: auto; max-height: 260px;
+      overflow-y: auto; flex: 1;
       scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
     }
-    .alert-empty { font-size: 0.72rem; color: var(--text-muted); padding: 4px 0; font-style: italic; }
-    .alert-item { display: flex; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 0.72rem; }
-    .alert-item:last-child { border-bottom: none; }
-    .alert-time { color: var(--text-muted); flex-shrink: 0; font-family: 'Courier New', monospace; }
-    .alert-item.failure .alert-msg { color: #e63e3e; }
-    .alert-item.cleared .alert-msg { color: var(--badge-green-fg); }
-    .alert-msg { color: var(--text-dim); }
+    .alert-empty {
+      font-size: 0.72rem; color: var(--text-muted); padding: 18px 14px;
+      font-style: italic; text-align: center;
+    }
+    .hist-item {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 9px 14px; border-bottom: 1px solid var(--border);
+      transition: background 0.12s;
+    }
+    .hist-item:last-child { border-bottom: none; }
+    .hist-item:hover { background: rgba(255,255,255,0.025); }
+    .hist-icon { font-size: 0.95rem; flex-shrink: 0; width: 18px; text-align: center; margin-top: 1px; }
+    .hist-body { flex: 1; min-width: 0; }
+    .hist-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 4px; }
+    .hist-title {
+      font-size: 0.74rem; font-weight: 600; color: var(--text-bright);
+      line-height: 1.3; word-break: break-word;
+    }
+    .hist-time {
+      font-size: 0.64rem; color: var(--text-muted); white-space: nowrap;
+      flex-shrink: 0; font-variant-numeric: tabular-nums; margin-top: 1px;
+    }
+    .hist-detail { font-size: 0.69rem; color: var(--text-dim); margin-top: 3px; line-height: 1.4; }
+    .hist-action {
+      display: inline-block; margin-top: 5px;
+      font-size: 0.64rem; padding: 2px 7px; cursor: pointer; font-family: inherit;
+      background: rgba(31,111,235,0.12); border: 1px solid #1f6feb;
+      color: #79c0ff; border-radius: 3px; transition: background 0.12s;
+    }
+    .hist-action:hover:not(:disabled) { background: rgba(31,111,235,0.28); }
+    .hist-action:disabled { opacity: 0.45; cursor: default; }
+    .hist-sev-critical { border-left: 3px solid #f85149; padding-left: 11px; }
+    .hist-sev-warning  { border-left: 3px solid #e3b341; padding-left: 11px; }
+    .hist-sev-info     { border-left: 3px solid #79c0ff; padding-left: 11px; }
+    .hist-sev-ok       { border-left: 3px solid #56d364; padding-left: 11px; }
 
     /* ── Fleet Status ────────────────────────────────── */
     .fleet-uptime-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
@@ -209,7 +255,7 @@
     .legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
     /* ── GHI Gauge ───────────────────────────────────── */
-    #ghi-gauge { display: block; width: 100%; height: 72px; }
+    #ghi-gauge { display: block; width: 100%; height: 110px; }
 
     /* ── Sensor Cards ────────────────────────────────── */
     .sensor-card { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--border); }
@@ -277,60 +323,32 @@
     .chart-wrapper { position: relative; height: 162px; }
     #temp-heatmap { width: 100%; height: 100%; display: block; }
 
-    /* ── Chaos Modal ─────────────────────────────────── */
-    .modal-overlay {
-      position: fixed; inset: 0; z-index: 2000;
-      background: rgba(0,0,0,0.55);
-      display: none; align-items: center; justify-content: center;
+    /* ── Toast Notifications ─────────────────────────── */
+    #toast-container {
+      position: fixed; bottom: 220px; right: 16px; z-index: 3000;
+      display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+      max-width: 340px;
     }
-    .modal-overlay.open { display: flex; }
-    @keyframes modal-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
-    .modal-card {
-      background: var(--surface); border: 1px solid var(--border2);
-      border-radius: 12px; width: 680px; max-width: 95vw; max-height: 80vh;
-      display: flex; flex-direction: column;
-      animation: modal-in 0.18s ease forwards;
+    @keyframes toast-in  { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes toast-out { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(20px); } }
+    .toast {
+      background: var(--surface); border: 1px solid var(--border2); border-radius: 8px;
+      padding: 10px 12px; display: flex; align-items: flex-start; gap: 10px;
+      pointer-events: all; animation: toast-in 0.25s ease forwards;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
     }
-    .modal-header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    .toast.toast-out { animation: toast-out 0.35s ease forwards; }
+    .toast-warning  { border-left: 3px solid #e3b341; }
+    .toast-critical { border-left: 3px solid #f85149; }
+    .toast-info     { border-left: 3px solid #79c0ff; }
+    .toast-icon  { font-size: 1.1rem; flex-shrink: 0; line-height: 1.2; }
+    .toast-title { font-size: 0.78rem; font-weight: 700; color: var(--text-bright); margin-bottom: 2px; }
+    .toast-body  { font-size: 0.72rem; color: var(--text-dim); line-height: 1.4; }
+    .toast-close {
+      background: none; border: none; color: var(--text-muted); cursor: pointer;
+      font-size: 0.75rem; line-height: 1; padding: 0; flex-shrink: 0; margin-left: auto;
     }
-    .modal-title { font-size: 1rem; font-weight: 600; color: var(--text-bright); }
-    .modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; line-height: 1; }
-    .modal-close:hover { color: var(--text); }
-    .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
-    .modal-note {
-      font-size: 0.78rem; color: var(--text-muted); background: var(--ph-bg);
-      border: 1px solid var(--border2); border-radius: 6px;
-      padding: 8px 12px; margin-bottom: 16px; line-height: 1.5;
-    }
-    .modal-note strong { color: var(--text-dim); }
-    .chaos-panel-grid { display: grid; gap: 6px; }
-    .cpm-item {
-      display: flex; align-items: center; justify-content: space-between; gap: 10px;
-      padding: 7px 10px; background: var(--ph-bg); border: 1px solid var(--border2);
-      border-radius: 6px;
-    }
-    .cpm-item.has-failure { border-color: #e6501f; background: rgba(230,80,31,0.06); }
-    .cpm-id { font-family: 'Courier New', monospace; font-size: 0.78rem; color: var(--text-dim); flex: 1; }
-    .cpm-select {
-      background: var(--input-bg); border: 1px solid var(--border2); border-radius: 4px;
-      color: var(--text-bright); padding: 4px 8px; font-size: 0.78rem;
-      font-family: inherit; outline: none; cursor: pointer;
-      appearance: none; min-width: 130px;
-    }
-    .cpm-select:focus { border-color: var(--badge-blue-fg); }
-    .cpm-select option { background: var(--surface); }
-    .modal-footer {
-      padding: 12px 20px; border-top: 1px solid var(--border);
-      display: flex; justify-content: flex-end; flex-shrink: 0;
-    }
-    .btn-clear-all {
-      background: none; border: 1px solid var(--border2); border-radius: 6px;
-      color: var(--text-dim); padding: 7px 16px; font-size: 0.82rem;
-      font-family: inherit; cursor: pointer; transition: border-color 0.15s, color 0.15s;
-    }
-    .btn-clear-all:hover { border-color: #f85149; color: #f85149; }
+    .toast-close:hover { color: var(--text); }
 
     /* ── Misc animations ─────────────────────────────── */
     @keyframes status-fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -379,24 +397,8 @@
   </div>
 </div>
 
-<!-- ══ Chaos Mode Modal ═══════════════════════════════════════════ -->
-<div class="modal-overlay" id="chaos-modal">
-  <div class="modal-card">
-    <div class="modal-header">
-      <span class="modal-title" id="chaos-modal-title">Chaos Mode</span>
-      <button class="modal-close" id="chaos-modal-close">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="modal-note" id="chaos-modal-note">
-        <strong>Ferramenta de desenvolvimento.</strong> Simula falhas reais para fins de demonstração. As falhas são visíveis apenas como redução de eficiência — o sistema não expõe o tipo da falha ao operador, assim como ocorreria em campo.
-      </div>
-      <div class="chaos-panel-grid" id="chaos-panel-grid"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-clear-all" id="btn-chaos-clear-all">Limpar todas as falhas</button>
-    </div>
-  </div>
-</div>
+<!-- ══ Toast Container ═══════════════════════════════════════════ -->
+<div id="toast-container"></div>
 
 <!-- ══ App Principal ═════════════════════════════════════════════ -->
 <div id="app">
@@ -419,17 +421,35 @@
 
     <!-- ── Left sidebar ── -->
     <aside class="sidebar sidebar-left">
+      <!--
+        CONTROLADOR DA SIMULAÇÃO — exclusivo para testes e demonstrações.
+        Na versão conectada a hardware real, a velocidade é fixada em tempo real
+        (1 hora/hora) e este painel deve ser ocultado ou desabilitado.
+      -->
       <div class="sidebar-section">
-        <div class="section-title" id="sb-simulation">Simulação</div>
+        <div class="section-title" id="sb-simulation">Controlador da Simulação</div>
         <div class="ctrl-row">
           <button class="btn-ctrl active" id="btn-play-pause" title="Pausar">⏸</button>
-          <button class="btn-speed active" id="btn-speed-1x">1×</button>
-          <button class="btn-speed" id="btn-speed-5x">5×</button>
+          <span class="ctrl-status-label" id="ctrl-status-label">Em andamento</span>
+        </div>
+        <div class="ctrl-field">
+          <label class="ctrl-label" id="ctrl-speed-lbl">Velocidade</label>
+          <div class="ctrl-speed-row">
+            <input type="range" id="speed-slider" class="ctrl-slider" min="1" max="24" step="1" value="1">
+            <input type="number" id="speed-input" class="ctrl-num-input" min="1" max="999" value="1">
+            <span class="ctrl-unit" id="ctrl-speed-unit">h/s</span>
+          </div>
+        </div>
+        <div class="ctrl-field">
+          <label class="ctrl-label" id="ctrl-date-lbl">Data</label>
+          <select id="date-select" class="ctrl-select">
+            <option value="">Aguardando dados...</option>
+          </select>
         </div>
       </div>
       <div class="sidebar-section alerts-wrap">
-        <div class="section-title" id="sb-alerts">Alertas</div>
-        <div id="alert-list"><div class="alert-empty" id="alerts-empty-msg">Nenhum alerta</div></div>
+        <div class="section-title" id="sb-alerts">Histórico de Eventos</div>
+        <div id="alert-list"><div class="alert-empty" id="alerts-empty-msg">Nenhum evento registrado</div></div>
       </div>
     </aside>
 
@@ -549,6 +569,7 @@
       <div class="tab-buttons">
         <button class="tab-btn active" id="tab-power">📊 <span id="tab-power-lbl">Potência</span></button>
         <button class="tab-btn" id="tab-temp">🌡 <span id="tab-temp-lbl">Temperatura</span></button>
+        <button class="tab-btn" id="tab-decisions">🤖 <span id="tab-decisions-lbl">Decisões</span></button>
       </div>
     </div>
     <div class="chart-wrapper" id="panel-power">
@@ -556,6 +577,9 @@
     </div>
     <div class="chart-wrapper" id="panel-temp" style="display:none">
       <canvas id="temp-heatmap"></canvas>
+    </div>
+    <div class="chart-wrapper" id="panel-decisions" style="display:none; overflow-y:auto; padding: 0 4px; flex-direction: column; gap: 0;">
+      <div id="decisions-list-main"></div>
     </div>
   </footer>
 </div>
@@ -591,8 +615,14 @@
       'hdr.72CEL':        '72 células — 440 Wp',
       'hdr.MODERNO':      'Moderno — 682 Wp',
       'hdr.panels':       (r,c,t) => `${r} × ${c}  (${t} painéis)`,
-      'sb.simulation':    'Simulação',
-      'sb.alerts':        'Alertas',
+      'sb.simulation':    'Controlador da Simulação',
+      'ctrl.running':     'Em andamento',
+      'ctrl.paused':      'Pausado',
+      'ctrl.speed':       'Velocidade',
+      'ctrl.date':        'Data',
+      'ctrl.speed-unit':  'h/s',
+      'sb.alerts':        'Histórico de Eventos',
+      'tab.decisions':    'Decisões',
       'sb.fleet':         'Status da Frota',
       'sb.irr':           'Irradiação',
       'sb.temp':          'Temperatura',
@@ -664,8 +694,14 @@
       'hdr.72CEL':        '72 cells — 440 Wp',
       'hdr.MODERNO':      'Modern — 682 Wp',
       'hdr.panels':       (r,c,t) => `${r} × ${c}  (${t} panels)`,
-      'sb.simulation':    'Simulation',
-      'sb.alerts':        'Alerts',
+      'sb.simulation':    'Simulation Controller',
+      'ctrl.running':     'Running',
+      'ctrl.paused':      'Paused',
+      'ctrl.speed':       'Speed',
+      'ctrl.date':        'Date',
+      'ctrl.speed-unit':  'hr/s',
+      'sb.alerts':        'Event History',
+      'tab.decisions':    'Decisions',
       'sb.fleet':         'Fleet Status',
       'sb.irr':           'Irradiation',
       'sb.temp':          'Temperature',
@@ -758,8 +794,12 @@
     const typeOpts = document.getElementById('cfg-type').options;
     ['60CEL','72CEL','MODERNO'].forEach((v, i) => { typeOpts[i].textContent = t(`pt.${v}`); });
 
-    document.getElementById('sb-simulation').textContent  = t('sb.simulation');
-    document.getElementById('sb-alerts').textContent      = t('sb.alerts');
+    document.getElementById('sb-simulation').textContent    = t('sb.simulation');
+    document.getElementById('ctrl-speed-lbl').textContent   = t('ctrl.speed');
+    document.getElementById('ctrl-date-lbl').textContent    = t('ctrl.date');
+    document.getElementById('ctrl-speed-unit').textContent  = t('ctrl.speed-unit');
+    document.getElementById('sb-alerts').textContent        = t('sb.alerts');
+    document.getElementById('tab-decisions-lbl').textContent = t('tab.decisions');
     document.getElementById('sb-fleet').textContent       = t('sb.fleet');
     document.getElementById('sb-irr').textContent         = t('sb.irr');
     document.getElementById('sb-temp').textContent        = t('sb.temp');
@@ -788,9 +828,6 @@
     document.getElementById('tt-lbl-expected').textContent = t('tt.expected');
     document.getElementById('tt-lbl-eff').textContent      = t('tt.eff');
     document.getElementById('tt-lbl-temp').textContent     = t('tt.temp');
-    document.getElementById('chaos-modal-title').textContent = t('chaos.title');
-    document.getElementById('chaos-modal-note').textContent  = t('chaos.note');
-    document.getElementById('btn-chaos-clear-all').textContent = t('chaos.clear.all');
 
     window.Dashboard?.updateChartLabel();
     window.Dashboard?.syncControls();
@@ -938,84 +975,9 @@
   window.hidePanelTooltip     = hidePanelTooltip;
   window.updateTrackedTooltip = updateTrackedTooltip;
 
-  // ── Chaos Modal ────────────────────────────────────────
-  let _chaosState = {};
-
-  window._updateChaosState = (activeFailures) => {
-    _chaosState = {};
-    activeFailures.forEach(entry => {
-      const [id, failure] = entry.split(':');
-      _chaosState[id] = failure;
-    });
-    const modal = document.getElementById('chaos-modal');
-    if (modal.classList.contains('open')) _syncChaosSelects();
-  };
-
-  function _syncChaosSelects() {
-    document.querySelectorAll('.cpm-item').forEach(item => {
-      const id  = item.dataset.id;
-      const sel = item.querySelector('.cpm-select');
-      if (sel) sel.value = _chaosState[id] || '';
-      item.classList.toggle('has-failure', !!_chaosState[id]);
-    });
-  }
-
-  function _buildChaosGrid() {
-    if (!currentConfig) return;
-    const grid = document.getElementById('chaos-panel-grid');
-    grid.innerHTML = '';
-    grid.style.gridTemplateColumns = `repeat(${Math.min(currentConfig.cols, 4)}, 1fr)`;
-
-    for (let r = 0; r < currentConfig.rows; r++) {
-      for (let c = 0; c < currentConfig.cols; c++) {
-        const id   = `panel_${r}_${c}`;
-        const item = document.createElement('div');
-        item.className = 'cpm-item';
-        item.dataset.id = id;
-        if (_chaosState[id]) item.classList.add('has-failure');
-
-        const label = document.createElement('span');
-        label.className   = 'cpm-id';
-        label.textContent = id;
-
-        const sel = document.createElement('select');
-        sel.className = 'cpm-select';
-        sel.innerHTML = `
-          <option value="">${t('chaos.normal')}</option>
-          <option value="overheat">${t('chaos.overheat')}</option>
-          <option value="sensor_fail">${t('chaos.sensor')}</option>
-          <option value="corrupted">${t('chaos.corrupted')}</option>
-        `;
-        sel.value = _chaosState[id] || '';
-        sel.addEventListener('change', () => {
-          window.electronAPI.chaosApply(id, sel.value || 'clear');
-          item.classList.toggle('has-failure', !!sel.value);
-        });
-
-        item.appendChild(label);
-        item.appendChild(sel);
-        grid.appendChild(item);
-      }
-    }
-  }
-
-  function openChaosModal() {
-    _buildChaosGrid();
-    document.getElementById('chaos-modal').classList.add('open');
-  }
-  function closeChaosModal() {
-    document.getElementById('chaos-modal').classList.remove('open');
-  }
-  window.openChaosModal = openChaosModal;
-
-  document.getElementById('chaos-modal-close').addEventListener('click', closeChaosModal);
-  document.getElementById('chaos-modal').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) closeChaosModal();
-  });
-  document.getElementById('btn-chaos-clear-all').addEventListener('click', () => {
-    window.electronAPI.chaosClearAll();
-    document.querySelectorAll('.cpm-select').forEach(s => { s.value = ''; });
-    document.querySelectorAll('.cpm-item').forEach(i => i.classList.remove('has-failure'));
+  // ── Chaos state changed → immediate toast ─────────────
+  window.electronAPI.onChaosStateChanged((data) => {
+    window.Dashboard?.onChaosChange?.(data);
   });
 
   // ── Init ───────────────────────────────────────────────

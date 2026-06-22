@@ -147,13 +147,12 @@ window.AppScene = (() => {
   // ── Color mapping ─────────────────────────────────────
 
   function _color(p) {
-    // No per-failure-type color — software doesn't expose what the failure is.
-    // Corrupted panels have no data: show as neutral gray.
-    if (p.status === 'corrupted') return new BABYLON.Color3(0.28, 0.30, 0.34);
-    if (p.efficiency <= 0)   return new BABYLON.Color3(0.06, 0.08, 0.12); // off/night
-    if (p.efficiency >= 85)  return new BABYLON.Color3(0.04, 0.58, 0.32); // green: normal
-    if (p.efficiency >= 50)  return new BABYLON.Color3(0.72, 0.50, 0.04); // yellow: degraded
-    return new BABYLON.Color3(0.74, 0.17, 0.17);                           // red: critical
+    if (p.status === 'corrupted') return new BABYLON.Color3(0.28, 0.30, 0.34); // cinza: sem dados
+    if (p.status === 'auto_off')  return new BABYLON.Color3(0.55, 0.08, 0.08); // vermelho escuro: desligado pelo sistema
+    if (p.efficiency <= 0)   return new BABYLON.Color3(0.06, 0.08, 0.12); // escuro: sem produção / noite
+    if (p.efficiency >= 85)  return new BABYLON.Color3(0.04, 0.58, 0.32); // verde: normal
+    if (p.efficiency >= 50)  return new BABYLON.Color3(0.72, 0.50, 0.04); // amarelo: degradado
+    return new BABYLON.Color3(0.74, 0.17, 0.17);                           // vermelho: crítico
   }
 
   return { init, update, setTheme };

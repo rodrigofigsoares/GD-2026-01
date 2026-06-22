@@ -32,4 +32,15 @@ function count() {
   return rows.length;
 }
 
-module.exports = { load, getRow, count };
+function getDates() {
+  if (!rows) load();
+  const seen  = new Set();
+  const dates = [];
+  rows.forEach((row, i) => {
+    const d = row['Data'];
+    if (d && !seen.has(d)) { seen.add(d); dates.push({ date: d, rowIndex: i }); }
+  });
+  return dates;
+}
+
+module.exports = { load, getRow, count, getDates };

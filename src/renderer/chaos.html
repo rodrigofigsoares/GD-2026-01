@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' 'unsafe-inline';">
+  <title>Chaos Mode</title>
+  <style>
+    :root {
+      --bg:       #0d1117; --surface: #161b22; --border: #21262d;
+      --border2:  #30363d; --text: #c9d1d9;   --text-dim: #8b949e;
+      --text-muted: #484f58; --bright: #e6edf3;
+      --green: #238636; --green-fg: #56d364;
+      --yellow: #9e6a03; --yellow-fg: #e3b341;
+      --orange: #bd561d; --orange-fg: #f0883e;
+      --red: #b91c1c;   --red-fg: #f85149;
+      --blue-fg: #79c0ff; --input-bg: #0d1117;
+      --accent: #1f6feb;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      height: 100vh; overflow: hidden;
+      display: flex; flex-direction: column; font-size: 13px;
+    }
+
+    /* ── Header ─────────────────────────────────── */
+    header {
+      padding: 12px 16px; background: var(--surface);
+      border-bottom: 1px solid var(--border2);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    .hdr-icon { font-size: 1.1rem; }
+    .hdr-title { font-size: 0.95rem; font-weight: 700; color: var(--bright); flex: 1; }
+    .hdr-badge {
+      font-size: 0.68rem; font-weight: 700; padding: 2px 8px;
+      border-radius: 4px; background: rgba(240,88,83,0.15);
+      color: var(--red-fg); letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    .btn-clear {
+      background: none; border: 1px solid var(--border2); border-radius: 5px;
+      color: var(--text-dim); padding: 4px 10px; font-size: 0.78rem;
+      font-family: inherit; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-clear:hover { border-color: var(--red-fg); color: var(--red-fg); }
+
+    /* ── Note ───────────────────────────────────── */
+    .dev-note {
+      font-size: 0.72rem; color: var(--text-muted); background: var(--surface);
+      border-bottom: 1px solid var(--border); padding: 6px 16px; line-height: 1.5;
+    }
+    .dev-note strong { color: var(--text-dim); }
+
+    /* ── Tabs ────────────────────────────────────── */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--surface); }
+    .tab-btn {
+      padding: 8px 18px; font-size: 0.78rem; font-family: inherit;
+      background: none; border: none; color: var(--text-dim);
+      border-bottom: 2px solid transparent; cursor: pointer;
+      transition: color 0.15s, border-color 0.15s; margin-bottom: -1px;
+    }
+    .tab-btn.active { color: var(--blue-fg); border-bottom-color: var(--blue-fg); }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+
+    /* ── Scroll area ─────────────────────────────── */
+    .tab-content { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+
+    /* ── Panel list ──────────────────────────────── */
+    .section-hdr {
+      padding: 10px 16px 6px; font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted);
+      position: sticky; top: 0; background: var(--bg); z-index: 1;
+    }
+    .panel-row {
+      display: grid;
+      grid-template-columns: 96px 12px 148px 1fr 38px;
+      align-items: center; gap: 8px;
+      padding: 6px 16px; border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .panel-row:hover { background: var(--surface); }
+    .panel-row.has-failure { border-left: 3px solid var(--orange-fg); padding-left: 13px; }
+    .panel-row.has-shutdown { border-left: 3px solid var(--red-fg); padding-left: 13px; }
+
+    .p-id { font-family: 'Courier New', monospace; font-size: 0.75rem; color: var(--text-dim); }
+    .p-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; transition: background 0.3s; }
+    .p-dot.normal    { background: var(--green-fg); }
+    .p-dot.warning   { background: var(--yellow-fg); }
+    .p-dot.alert     { background: var(--orange-fg); }
+    .p-dot.critical  { background: var(--red-fg); }
+    .p-dot.off       { background: var(--text-muted); }
+
+    .p-select {
+      background: var(--input-bg); border: 1px solid var(--border2);
+      border-radius: 4px; color: var(--bright); padding: 4px 6px;
+      font-size: 0.75rem; font-family: inherit; appearance: none;
+      width: 100%; cursor: pointer; outline: none; transition: border-color 0.15s;
+    }
+    .p-select:focus { border-color: var(--accent); }
+    .p-select option { background: var(--surface); }
+
+    .slider-wrap { display: flex; align-items: center; gap: 5px; }
+    .p-slider {
+      flex: 1; height: 4px; accent-color: var(--orange-fg);
+      appearance: auto; cursor: pointer;
+    }
+    .p-slider.hidden { visibility: hidden; }
+    .p-pct { font-size: 0.72rem; color: var(--text-dim); text-align: right; min-width: 30px; }
+    .p-pct.hidden { visibility: hidden; }
+
+    /* ── Global overrides ────────────────────────── */
+    .global-section { padding: 0 16px 16px; }
+    .override-card {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
+    }
+    .override-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .override-title { font-size: 0.82rem; font-weight: 600; color: var(--bright); }
+    .override-lbl { font-size: 0.68rem; color: var(--text-dim); }
+    .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+    .toggle {
+      position: relative; width: 34px; height: 18px;
+      background: var(--border2); border-radius: 9px; cursor: pointer;
+      transition: background 0.2s; flex-shrink: 0;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 14px; height: 14px; border-radius: 50%; background: #fff;
+      transition: transform 0.2s;
+    }
+    .toggle.on::after { transform: translateX(16px); }
+    .override-val { font-size: 0.85rem; font-weight: 700; color: var(--bright); min-width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+    .override-slider { width: 100%; height: 4px; accent-color: var(--accent); margin-top: 10px; }
+    .override-range { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; }
+
+    .override-card.active { border-color: var(--accent); }
+    .override-card.active .override-title { color: var(--blue-fg); }
+
+    /* ── GHI scope selector ──────────────────────── */
+    .scope-row {
+      display: flex; align-items: center; gap: 12px;
+      margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .scope-label { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; }
+    .scope-opt {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 0.75rem; color: var(--text); cursor: pointer;
+    }
+    .scope-opt input[type=radio] { accent-color: var(--accent); cursor: pointer; }
+    .group-grid-wrap {
+      margin-top: 8px; padding: 8px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; max-height: 140px; overflow-y: auto;
+    }
+    .group-grid {
+      display: flex; flex-wrap: wrap; gap: 4px;
+    }
+    .group-check {
+      display: flex; align-items: center; gap: 3px;
+      font-family: 'Courier New', monospace; font-size: 0.68rem; color: var(--text-dim);
+      padding: 2px 6px; background: var(--surface); border-radius: 3px;
+      cursor: pointer; border: 1px solid transparent; transition: border-color 0.1s;
+    }
+    .group-check:hover { border-color: var(--border2); }
+    .group-check input { accent-color: var(--accent); cursor: pointer; }
+    .group-check.selected { border-color: var(--accent); color: var(--blue-fg); }
+    .group-actions { display: flex; gap: 6px; margin-top: 6px; }
+    .btn-group-action {
+      font-size: 0.68rem; padding: 2px 8px; background: none;
+      border: 1px solid var(--border2); border-radius: 3px;
+      color: var(--text-dim); cursor: pointer; font-family: inherit;
+    }
+    .btn-group-action:hover { border-color: var(--accent); color: var(--blue-fg); }
+
+    /* ── Decisions tab ───────────────────────────── */
+    .decision-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .decision-item:hover { background: var(--surface); }
+    .decision-item.reverted { opacity: 0.45; }
+    .decision-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+    .decision-body { flex: 1; min-width: 0; }
+    .decision-title { font-size: 0.82rem; color: var(--bright); font-weight: 600; }
+    .decision-detail { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; font-family: 'Courier New', monospace; }
+    .decision-ts { font-size: 0.68rem; color: var(--text-muted); margin-top: 3px; }
+    .btn-reinstate {
+      flex-shrink: 0; font-size: 0.72rem; padding: 3px 10px;
+      background: rgba(31,111,235,0.1); border: 1px solid var(--accent);
+      color: var(--blue-fg); border-radius: 4px; cursor: pointer;
+      font-family: inherit; transition: background 0.15s;
+      align-self: center;
+    }
+    .btn-reinstate:hover { background: rgba(31,111,235,0.25); }
+    .btn-reinstate:disabled { opacity: 0.4; cursor: not-allowed; }
+    .decision-empty { padding: 32px 16px; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
+
+    /* ── Loading state ───────────────────────────── */
+    .loading { display: flex; align-items: center; justify-content: center; height: 200px; color: var(--text-muted); font-size: 0.82rem; }
+
+    /* ── Stats footer in panels tab ─────────────── */
+    .status-bar {
+      position: sticky; bottom: 0; background: var(--surface);
+      border-top: 1px solid var(--border); padding: 6px 16px;
+      display: flex; gap: 16px; font-size: 0.72rem; color: var(--text-dim);
+    }
+    .status-bar strong { color: var(--text); font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="hdr-icon">⚡</span>
+  <span class="hdr-title">Chaos Mode</span>
+  <span class="hdr-badge">Dev Tool</span>
+  <button class="btn-clear" id="btn-clear-all">🗑 Limpar tudo</button>
+</header>
+
+<div class="dev-note">
+  <strong>Somente para demonstração.</strong> Falhas injetadas afetam eficiência e temperatura dos painéis. O sistema de monitoramento <em>não</em> expõe o tipo de falha ao operador — apenas o desvio de eficiência.
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="panels">⚙ Painéis</button>
+  <button class="tab-btn" data-tab="global">🌍 Ambiente</button>
+  <button class="tab-btn" data-tab="decisions">🤖 Decisões</button>
+</div>
+
+<!-- ── Painéis tab ────────────────────────────── -->
+<div class="tab-content" id="tab-panels">
+  <div class="loading" id="panels-loading">Aguardando configuração...</div>
+  <div id="panel-list" style="display:none"></div>
+  <div class="status-bar" id="status-bar" style="display:none">
+    Normais: <strong id="sb-normal">—</strong>
+    Com falha: <strong id="sb-fail">—</strong>
+    Críticos: <strong id="sb-critical">—</strong>
+  </div>
+</div>
+
+<!-- ── Ambiente tab ───────────────────────────── -->
+<div class="tab-content" id="tab-global" style="display:none">
+  <div style="padding: 10px 16px 0;">
+    <div class="section-hdr" style="padding-left:0; position:static;">Sobrescrever variáveis climáticas do CSV</div>
+  </div>
+  <div class="global-section">
+
+    <!-- GHI / Irradiância com escopo de grupo -->
+    <div class="override-card" id="card-ghi">
+      <div class="override-header">
+        <div>
+          <div class="override-title">☀ Irradiância (GHI)</div>
+          <div class="override-lbl">Simula nuvens, chuva ou sombreamento parcial por grupo de painéis</div>
+        </div>
+        <div class="toggle-wrap">
+          <span class="override-val" id="ghi-val">—</span>
+          <div class="toggle" id="toggle-ghi"></div>
+        </div>
+      </div>
+      <input type="range" class="override-slider" id="slider-ghi" min="0" max="1200" step="10" value="300" disabled>
+      <div class="override-range"><span>0 W/m²</span><span>300 ☁</span><span>800 🌤</span><span>1200 W/m²</span></div>
+
+      <div class="scope-row">
+        <span class="scope-label">Aplicar a:</span>
+        <label class="scope-opt">
+          <input type="radio" name="ghi-scope" id="ghi-scope-all" value="all" checked> Todos os painéis
+        </label>
+        <label class="scope-opt">
+          <input type="radio" name="ghi-scope" id="ghi-scope-group" value="group"> Grupo personalizado
+        </label>
+      </div>
+      <div class="group-grid-wrap" id="ghi-group-wrap" style="display:none">
+        <div class="group-grid" id="ghi-group-grid"></div>
+        <div class="group-actions">
+          <button class="btn-group-action" id="ghi-sel-all">Selecionar todos</button>
+          <button class="btn-group-action" id="ghi-sel-none">Limpar seleção</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="override-card" id="card-wind">
+      <div class="override-header">
+        <div>
+          <div class="override-title">💨 Velocidade do vento</div>
+          <div class="override-lbl">CSV: WS10M_ms · Limiar atenção: 15 m/s · Crítico: 25 m/s</div>
+        </div>
+        <div class="toggle-wrap">
+          <span class="override-val" id="wind-val">—</span>
+          <div class="toggle" id="toggle-wind"></div>
+        </div>
+      </div>
+      <input type="range" class="override-slider" id="slider-wind" min="0" max="50" step="0.5" value="18" disabled>
+      <div class="override-range"><span>0 m/s</span><span>15 ⚠</span><span>25 🔴</span><span>50 m/s</span></div>
+    </div>
+
+    <div class="override-card" id="card-rh">
+      <div class="override-header">
+        <div>
+          <div class="override-title">💧 Umidade relativa</div>
+          <div class="override-lbl">CSV: RH2M_pct · Limiar atenção: 85%</div>
+        </div>
+        <div class="toggle-wrap">
+          <span class="override-val" id="rh-val">—</span>
+          <div class="toggle" id="toggle-rh"></div>
+        </div>
+      </div>
+      <input type="range" class="override-slider" id="slider-rh" min="0" max="100" step="1" value="88" disabled>
+      <div class="override-range"><span>0%</span><span>85% ⚠</span><span>100%</span></div>
+    </div>
+
+    <div class="override-card" id="card-temp">
+      <div class="override-header">
+        <div>
+          <div class="override-title">🌡 Offset de temperatura</div>
+          <div class="override-lbl">Adiciona °C à temperatura do ar do CSV (afeta Tcel e derating)</div>
+        </div>
+        <div class="toggle-wrap">
+          <span class="override-val" id="temp-val">—</span>
+          <div class="toggle" id="toggle-temp"></div>
+        </div>
+      </div>
+      <input type="range" class="override-slider" id="slider-temp" min="-10" max="30" step="1" value="10" disabled>
+      <div class="override-range"><span>-10°C</span><span>0</span><span>+30°C</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Decisões tab ───────────────────────────── -->
+<div class="tab-content" id="tab-decisions" style="display:none">
+  <div class="section-hdr">Decisões Autônomas do Sistema</div>
+  <div id="decisions-list">
+    <div class="decision-empty">Nenhuma decisão registrada ainda.</div>
+  </div>
+</div>
+
+<script>
+  // ── Types with sliders ──────────────────────────────
+  const TYPES = [
+    { value: '',           label: '— Normal —',              hasSlider: false },
+    { value: 'overheat',   label: '🌡 Superaquecimento',     hasSlider: true  },
+    { value: 'hotspot',    label: '🔥 Hot-Spot',             hasSlider: true  },
+    { value: 'pid',        label: '📉 Degradação PID',       hasSlider: true  },
+    { value: 'bypass_fail',label: '⚡ Falha Diodo Bypass',   hasSlider: true  },
+    { value: 'soiling',    label: '🟤 Acúmulo de Sujeira',   hasSlider: true  },
+    { value: 'string_fail',label: '🔌 Falha de String',      hasSlider: false },
+    { value: 'sensor_fail',label: '📡 Falha de Sensor',      hasSlider: false },
+    { value: 'corrupted',  label: '💀 Dado Corrompido',      hasSlider: false },
+  ];
+
+  // ── State ───────────────────────────────────────────
+  let _config    = null;
+  let _failures  = {};
+  let _globalOn  = { ghi: false, wind: false, rh: false, temp: false };
+  let _ghiGroup  = null; // null = all panels, or Set of panel IDs
+
+  // ── Tab switching ───────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+      document.getElementById('tab-panels').style.display    = tab === 'panels'    ? '' : 'none';
+      document.getElementById('tab-global').style.display    = tab === 'global'    ? '' : 'none';
+      document.getElementById('tab-decisions').style.display = tab === 'decisions' ? '' : 'none';
+    });
+  });
+
+  // ── Build panel grid ────────────────────────────────
+  function buildPanels(config) {
+    _config = config;
+    const list = document.getElementById('panel-list');
+    list.innerHTML = '';
+    _buildGhiGroupGrid(config);
+
+    for (let r = 0; r < config.rows; r++) {
+      const hdr = document.createElement('div');
+      hdr.className   = 'section-hdr';
+      hdr.textContent = `Linha ${r}`;
+      list.appendChild(hdr);
+
+      for (let c = 0; c < config.cols; c++) {
+        const id  = `panel_${r}_${c}`;
+        const row = _makeRow(id);
+        list.appendChild(row);
+      }
+    }
+
+    document.getElementById('panels-loading').style.display = 'none';
+    list.style.display = '';
+    document.getElementById('status-bar').style.display = '';
+    _syncStatusBar();
+  }
+
+  // ── Build GHI group checkboxes ──────────────────────
+  function _buildGhiGroupGrid(config) {
+    const grid = document.getElementById('ghi-group-grid');
+    grid.innerHTML = '';
+    for (let r = 0; r < config.rows; r++) {
+      for (let c = 0; c < config.cols; c++) {
+        const id = `panel_${r}_${c}`;
+        const label = document.createElement('label');
+        label.className = 'group-check';
+        label.dataset.id = id;
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.value = id; cb.checked = false;
+        cb.addEventListener('change', _onGhiGroupChange);
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(id.replace('panel_', '')));
+        grid.appendChild(label);
+      }
+    }
+  }
+
+  function _onGhiGroupChange() {
+    const checked = [...document.querySelectorAll('#ghi-group-grid input:checked')].map(cb => cb.value);
+    _ghiGroup = checked.length > 0 ? checked : null;
+    document.querySelectorAll('#ghi-group-grid .group-check').forEach(lbl => {
+      lbl.classList.toggle('selected', lbl.querySelector('input').checked);
+    });
+    if (_globalOn.ghi) _sendGhi();
+  }
+
+  document.getElementById('ghi-sel-all').addEventListener('click', () => {
+    document.querySelectorAll('#ghi-group-grid input').forEach(cb => { cb.checked = true; });
+    _onGhiGroupChange();
+  });
+  document.getElementById('ghi-sel-none').addEventListener('click', () => {
+    document.querySelectorAll('#ghi-group-grid input').forEach(cb => { cb.checked = false; });
+    _onGhiGroupChange();
+  });
+
+  // Scope radio toggle
+  document.querySelectorAll('input[name="ghi-scope"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const isGroup = document.getElementById('ghi-scope-group').checked;
+      document.getElementById('ghi-group-wrap').style.display = isGroup ? '' : 'none';
+      if (!isGroup) { _ghiGroup = null; }
+      if (_globalOn.ghi) _sendGhi();
+    });
+  });
+
+  function _sendGhi() {
+    const val = parseFloat(document.getElementById('slider-ghi').value);
+    const scopeAll = document.getElementById('ghi-scope-all').checked;
+    const ghiGroup = scopeAll ? null : (_ghiGroup || null);
+    window.chaosAPI.setGlobal({ ghi: _globalOn.ghi ? val : null, ghiGroup: ghiGroup });
+    document.getElementById('ghi-val').textContent = _globalOn.ghi ? `${val.toFixed(0)} W/m²` : '—';
+    const card = document.getElementById('card-ghi');
+    card.classList.toggle('active', _globalOn.ghi);
+    if (card.classList.contains('active')) card.querySelector('.override-title').style.color = 'var(--blue-fg)';
+    else card.querySelector('.override-title').style.color = '';
+  }
+
+  // GHI toggle + slider
+  document.getElementById('toggle-ghi').addEventListener('click', function () {
+    _globalOn.ghi = !_globalOn.ghi;
+    this.classList.toggle('on', _globalOn.ghi);
+    document.getElementById('slider-ghi').disabled = !_globalOn.ghi;
+    _sendGhi();
+  });
+  document.getElementById('slider-ghi').addEventListener('input', () => { if (_globalOn.ghi) _sendGhi(); });
+
+  // ── Panel row factory ───────────────────────────────
+  function _makeRow(id) {
+    const row = document.createElement('div');
+    row.className  = 'panel-row';
+    row.dataset.id = id;
+
+    const idEl = document.createElement('span');
+    idEl.className   = 'p-id';
+    idEl.textContent = id;
+
+    const dot = document.createElement('div');
+    dot.className = 'p-dot off';
+    dot.id        = `dot-${id}`;
+
+    const sel = document.createElement('select');
+    sel.className = 'p-select';
+    sel.id        = `sel-${id}`;
+    TYPES.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.value; opt.textContent = t.label;
+      sel.appendChild(opt);
+    });
+
+    const sliderWrap = document.createElement('div');
+    sliderWrap.className = 'slider-wrap';
+    const slider = document.createElement('input');
+    slider.type = 'range'; slider.min = 0; slider.max = 100; slider.step = 5; slider.value = 70;
+    slider.className = 'p-slider hidden';
+    slider.id        = `slider-${id}`;
+    const pct = document.createElement('span');
+    pct.className   = 'p-pct hidden';
+    pct.id          = `pct-${id}`;
+    pct.textContent = '70%';
+    sliderWrap.appendChild(slider);
+
+    row.appendChild(idEl);
+    row.appendChild(dot);
+    row.appendChild(sel);
+    row.appendChild(sliderWrap);
+    row.appendChild(pct);
+
+    sel.addEventListener('change', () => _onSelectChange(id, sel, slider, pct, row));
+    slider.addEventListener('input', () => {
+      pct.textContent = `${slider.value}%`;
+      _applyFailure(id, sel.value, parseInt(slider.value));
+    });
+
+    return row;
+  }
+
+  function _onSelectChange(id, sel, slider, pct, row) {
+    const type     = sel.value;
+    const typeSpec = TYPES.find(t => t.value === type);
+    const show     = typeSpec?.hasSlider ?? false;
+
+    slider.className = show ? 'p-slider' : 'p-slider hidden';
+    pct.className    = show ? 'p-pct'    : 'p-pct hidden';
+    row.classList.toggle('has-failure', !!type);
+
+    if (!type) {
+      delete _failures[id];
+      window.chaosAPI.apply(id, 'clear', 0);
+    } else {
+      const intensity = show ? parseInt(slider.value) : 100;
+      _applyFailure(id, type, intensity);
+    }
+    _syncStatusBar();
+  }
+
+  function _applyFailure(id, type, intensity) {
+    if (!type || type === 'clear') { delete _failures[id]; }
+    else { _failures[id] = { type, intensity }; }
+    window.chaosAPI.apply(id, type || 'clear', intensity);
+  }
+
+  function _syncSelectsFromFailures(activeFailures) {
+    if (!_config) return;
+    activeFailures.forEach(f => {
+      const sel    = document.getElementById(`sel-${f.id}`);
+      const slider = document.getElementById(`slider-${f.id}`);
+      const pct    = document.getElementById(`pct-${f.id}`);
+      const row    = document.querySelector(`.panel-row[data-id="${f.id}"]`);
+      if (!sel) return;
+      sel.value = f.type || '';
+      if (slider && pct) {
+        const typeSpec = TYPES.find(t => t.value === f.type);
+        const show = typeSpec?.hasSlider ?? false;
+        slider.className = show ? 'p-slider' : 'p-slider hidden';
+        pct.className    = show ? 'p-pct'    : 'p-pct hidden';
+        if (show) { slider.value = f.intensity; pct.textContent = `${f.intensity}%`; }
+      }
+      row?.classList.toggle('has-failure', !!f.type);
+      _failures[f.id] = { type: f.type, intensity: f.intensity };
+    });
+    _syncStatusBar();
+  }
+
+  // ── Status dots ─────────────────────────────────────
+  function _updateDots(panels) {
+    let normal = 0, fail = 0, crit = 0;
+    panels.forEach(p => {
+      const dot = document.getElementById(`dot-${p.id}`);
+      if (!dot) return;
+      const eff = p.efficiency;
+      let cls = 'off';
+      if (p.status === 'corrupted') { cls = 'off'; }
+      else if (p.status !== 'normal') {
+        if (eff >= 70)      { cls = 'warning'; fail++; }
+        else if (eff >= 40) { cls = 'alert';   fail++; }
+        else                { cls = 'critical'; crit++; }
+      } else { cls = 'normal'; normal++; }
+      dot.className = `p-dot ${cls}`;
+      const row = document.querySelector(`.panel-row[data-id="${p.id}"]`);
+      if (row) row.classList.toggle('has-shutdown', !!p.autoOff);
+    });
+    document.getElementById('sb-normal').textContent   = normal;
+    document.getElementById('sb-fail').textContent     = fail;
+    document.getElementById('sb-critical').textContent = crit;
+  }
+
+  function _syncStatusBar() {
+    const total   = _config ? _config.rows * _config.cols : 0;
+    const failing = Object.keys(_failures).length;
+    document.getElementById('sb-normal').textContent   = total - failing;
+    document.getElementById('sb-fail').textContent     = failing;
+    document.getElementById('sb-critical').textContent = '—';
+  }
+
+  // ── Global overrides (wind/rh/temp) ─────────────────
+  function _setupGlobal(id, toggleId, sliderId, valId, formatter, sendKey) {
+    const toggle = document.getElementById(toggleId);
+    const slider = document.getElementById(sliderId);
+    const valEl  = document.getElementById(valId);
+    const card   = document.getElementById(`card-${id}`);
+
+    function _send() {
+      const on  = _globalOn[id];
+      const val = parseFloat(slider.value);
+      valEl.textContent = on ? formatter(val) : '—';
+      card.classList.toggle('active', on);
+      slider.disabled = !on;
+      const update = {};
+      update[sendKey] = on ? val : (sendKey === 'tempOffset' ? 0 : null);
+      window.chaosAPI.setGlobal(update);
+    }
+
+    toggle.addEventListener('click', () => {
+      _globalOn[id] = !_globalOn[id];
+      toggle.classList.toggle('on', _globalOn[id]);
+      _send();
+    });
+    slider.addEventListener('input', () => { if (_globalOn[id]) _send(); });
+    valEl.textContent = '—';
+  }
+
+  _setupGlobal('wind', 'toggle-wind', 'slider-wind', 'wind-val', v => `${v.toFixed(1)} m/s`, 'wind');
+  _setupGlobal('rh',   'toggle-rh',   'slider-rh',   'rh-val',   v => `${v.toFixed(0)}%`,    'rh');
+  _setupGlobal('temp', 'toggle-temp', 'slider-temp', 'temp-val', v => `${v > 0 ? '+' : ''}${v}°C`, 'tempOffset');
+
+  // ── Clear all (painéis + overrides de ambiente) ─────
+  document.getElementById('btn-clear-all').addEventListener('click', () => {
+    window.chaosAPI.clearAll(); // reseta falhas E globalOverrides no main process
+
+    // Reset painel UI
+    _failures = {};
+    document.querySelectorAll('.p-select').forEach(s => { s.value = ''; });
+    document.querySelectorAll('.p-slider').forEach(s => s.classList.add('hidden'));
+    document.querySelectorAll('.p-pct').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.panel-row').forEach(r => r.classList.remove('has-failure', 'has-shutdown'));
+    _syncStatusBar();
+
+    // Reset GHI
+    _globalOn.ghi = false;
+    _ghiGroup     = null;
+    document.getElementById('toggle-ghi').classList.remove('on');
+    document.getElementById('slider-ghi').disabled = true;
+    document.getElementById('ghi-val').textContent = '—';
+    document.getElementById('card-ghi').classList.remove('active');
+    document.getElementById('card-ghi').querySelector('.override-title').style.color = '';
+    document.getElementById('ghi-scope-all').checked   = true;
+    document.getElementById('ghi-scope-group').checked = false;
+    document.getElementById('ghi-group-wrap').style.display = 'none';
+    document.querySelectorAll('#ghi-group-grid input').forEach(cb => { cb.checked = false; });
+    document.querySelectorAll('#ghi-group-grid .group-check').forEach(lbl => lbl.classList.remove('selected'));
+
+    // Reset vento, umidade, temperatura
+    ['wind', 'rh', 'temp'].forEach(id => {
+      _globalOn[id] = false;
+      document.getElementById(`toggle-${id}`).classList.remove('on');
+      document.getElementById(`slider-${id}`).disabled = true;
+      document.getElementById(`${id === 'temp' ? 'temp' : id}-val`).textContent = '—';
+      document.getElementById(`card-${id}`).classList.remove('active');
+    });
+  });
+
+  // ── Render decisions ────────────────────────────────
+  function _renderDecisions(decisions) {
+    const list = document.getElementById('decisions-list');
+    if (!list) return;
+
+    if (!decisions || decisions.length === 0) {
+      list.innerHTML = '<div class="decision-empty">Nenhuma decisão registrada ainda.</div>';
+      return;
+    }
+
+    const TYPE_LABELS = {
+      panel_shutdown: 'Desligamento preventivo',
+    };
+    const TYPE_ICONS = {
+      panel_shutdown: '⛔',
+    };
+
+    list.innerHTML = decisions.map(d => {
+      const label    = TYPE_LABELS[d.type] || d.type;
+      const icon     = TYPE_ICONS[d.type]  || '🔔';
+      const tsShort  = d.ts ? d.ts.replace('T', ' ').slice(0, 16) : '—';
+      const revertedTxt = d.reverted ? ' · <em>Religado</em>' : '';
+      const btnHtml  = (d.type === 'panel_shutdown' && !d.reverted)
+        ? `<button class="btn-reinstate" data-panel="${d.panelId}">🔌 Religar</button>`
+        : '';
+      return `
+        <div class="decision-item ${d.reverted ? 'reverted' : ''}" data-seq="${d.seq}">
+          <div class="decision-icon">${icon}</div>
+          <div class="decision-body">
+            <div class="decision-title">${d.panelId} — ${label}</div>
+            <div class="decision-detail">${d.reason}</div>
+            <div class="decision-ts">${tsShort}${revertedTxt}</div>
+          </div>
+          ${btnHtml}
+        </div>`;
+    }).join('');
+
+    // Wire reinstate buttons
+    list.querySelectorAll('.btn-reinstate').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const panelId = btn.dataset.panel;
+        window.chaosAPI.reinstate(panelId);
+        btn.disabled = true;
+        btn.textContent = 'Religado ✓';
+      });
+    });
+  }
+
+  // ── IPC listeners ───────────────────────────────────
+  window.chaosAPI.onConfig(({ config, activeFailures }) => {
+    buildPanels(config);
+    _syncSelectsFromFailures(activeFailures || []);
+  });
+
+  window.chaosAPI.onTick((data) => {
+    if (data.panels)    _updateDots(data.panels);
+    if (data.decisions) _renderDecisions(data.decisions);
+  });
+</script>
+</body>
+</html>
