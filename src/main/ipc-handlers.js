@@ -152,17 +152,26 @@ function _buildPayload(row) {
       const fType     = failure?.type     || null;
       const intensity = failure?.intensity ?? 100;
 
-      // GHI override: só afeta power (actual), NÃO expectedPower (= previsão CSV)
-      const inGhiGroup  = globalOverrides.ghiGroup === null || globalOverrides.ghiGroup.has(id);
-      const ghiForPanel = (globalOverrides.ghi !== null && inGhiGroup) ? globalOverrides.ghi : ghi;
-      // ghiRatio: quanto de luz o painel recebe vs. baseline do CSV
-      //   < 1 → sombra / nuvem   |   > 1 → dia atipicamente ensolarado
-      //   = 1 → sem override (ou noite — evita divisão por zero)
-      const ghiRatio = ghi > 0 ? ghiForPanel / ghi : 1;
+      const inGhiGroup     = globalOverrides.ghiGroup === null || globalOverrides.ghiGroup.has(id);
+      const isGhiOverride  = globalOverrides.ghi !== null && inGhiGroup;
+      const ghiForPanel    = isGhiOverride ? globalOverrides.ghi : ghi;
+
+      // Quando override ativo: normaliza para STC (1000 W/m²) — evita distorção
+      // de curva no amanhecer, onde pReal≈0 inflaria o ghiRatio desproporcionalmente.
+      // Sem override: ratio = 1 (ghiForPanel == ghi).
+      const ghiRatio = isGhiOverride
+        ? ghiForPanel / 1000
+        : (ghi > 0 ? ghiForPanel / ghi : 1);
 
       // expectedPower: sempre do CSV (= previsão/baseline do dia)
-      // Na versão comercial, virá de uma API de previsão do tempo.
       const expectedPower = pReal;
+
+      // pBase: com override, recalcula potência direto da irradiância sobreposta
+      // usando a fórmula PV (GHI × Pmax/1000 × fTemp × PR).
+      // Sem override: usa o pReal do CSV (inclui calibrações NOCT reais).
+      const pBase = isGhiOverride
+        ? ghiForPanel * spec.peakPower / 1000 * fNormal * MODEL.PR
+        : pReal;
 
       let status    = 'normal';
       let effHealth = 100; // saúde derivada da falha (100 = sem falha)
@@ -220,10 +229,9 @@ function _buildPayload(row) {
         effHealth = 0;
       }
 
-      // ── Eficiência final: saúde × irradiância relativa ─────────
+      // ── Eficiência final e potência ────────────────────────────
       const eff   = effHealth * ghiRatio;
-      // power: naturalmente 0 à noite pois expectedPower=0
-      const power = expectedPower * (eff / 100);
+      const power = pBase * (effHealth / 100);
 
       // ── Persistência noturna de anomalia ───────────────────────
       // Problema durante o dia não some só porque o sol baixou.
@@ -272,7 +280,10 @@ function _buildPayload(row) {
     timestamp: `${row['Data']}T${hourStr}:00:00`,
     speed, isPaused,
     globalMetrics: {
-      ghi:           parseFloat(ghi.toFixed(1)),
+      // Quando override global (todos os painéis), o gauge mostra a irradiância sobreposta
+      ghi: globalOverrides.ghi !== null && globalOverrides.ghiGroup === null
+        ? parseFloat(globalOverrides.ghi.toFixed(1))
+        : parseFloat(ghi.toFixed(1)),
       airTemp:       parseFloat(airTemp.toFixed(1)),
       rh:            parseFloat(rh.toFixed(1)),
       wind:          parseFloat(wind.toFixed(1)),

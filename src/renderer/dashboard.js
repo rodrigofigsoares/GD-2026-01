@@ -531,13 +531,15 @@ window.Dashboard = (() => {
     // Qualquer status que não seja 'normal' é um problema visível no mapa 3D.
     // Agrupa por gravidade: desligados (crítico) > baixa eficiência < 50% (crítico) > degradados (aviso)
     const offPanels  = panels.filter(p => p.status === 'auto_off');
+    // Inclui qualquer painel com eficiência abaixo do esperado, independente do status —
+    // captura tanto falhas do Chaos Mode quanto irradiância baixa via override de GHI.
     const critPanels = panels.filter(p =>
-      p.status !== 'normal' && p.status !== 'auto_off' && p.status !== 'corrupted' &&
-      p.efficiency < 50 && p.efficiency > 0
+      p.efficiency > 0 && p.efficiency < 50 &&
+      p.status !== 'auto_off' && p.status !== 'corrupted'
     );
     const warnPanels = panels.filter(p =>
-      p.status !== 'normal' && p.status !== 'auto_off' && p.status !== 'corrupted' &&
-      p.efficiency >= 50
+      p.efficiency >= 50 && p.efficiency < 85 &&
+      p.status !== 'auto_off' && p.status !== 'corrupted'
     );
 
     // Sombra total: dia (ghi CSV > 10) mas nenhum painel produz (override ghi=0 ou bloqueio físico)
