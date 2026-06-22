@@ -85,11 +85,12 @@ function _buildPayload(row) {
   const { GAMMA, T_REF } = MODEL;
   const FT = FAULT_THRESHOLDS;
 
-  const ghi      = parseFloat(row['GHI_Wh_m2'])       || 0;
-  const rawAir   = parseFloat(row['T2M_C'])             || 0;
+  const csvKey   = spec?.csvKey || type; // permite que a chave UI (144CEL) difira do prefixo CSV (MODERNO)
+  const ghi      = parseFloat(row['GHI_Wh_m2'])          || 0;
+  const rawAir   = parseFloat(row['T2M_C'])               || 0;
   const airTemp  = rawAir + (globalOverrides.tempOffset || 0);
-  const cellTemp = parseFloat(row[`${type}_Tcel_C`])   || 0;
-  const pReal    = parseFloat(row[`${type}_Preal_W`])  || 0;
+  const cellTemp = parseFloat(row[`${csvKey}_Tcel_C`])   || 0;
+  const pReal    = parseFloat(row[`${csvKey}_Preal_W`])  || 0;
   const wind     = globalOverrides.wind !== null ? globalOverrides.wind : (parseFloat(row['WS10M_ms']) || 0);
   const rh       = globalOverrides.rh   !== null ? globalOverrides.rh  : (parseFloat(row['RH2M_pct']) || 0);
   const hour     = parseInt(row['Hora']) || 0;

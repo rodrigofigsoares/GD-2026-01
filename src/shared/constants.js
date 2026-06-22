@@ -13,6 +13,7 @@ const PANEL_TYPES = {
     label:     '144 células',
     peakPower: 682,
     area:      3.10,
+    csvKey:    'MODERNO', // coluna no CSV é MODERNO_Tcel_C / MODERNO_Preal_W
   },
 };
 

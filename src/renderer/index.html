@@ -290,14 +290,17 @@
 
     /* ── Status Banner ──────────────────────────────── */
     #status-banner {
-      position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-      padding: 5px 16px; border-radius: 20px; font-size: 0.78rem; font-weight: 600;
-      z-index: 5; pointer-events: none; letter-spacing: 0.02em;
-      transition: background 0.4s, color 0.4s; white-space: nowrap;
+      position: absolute; top: 10px; left: 10px;
+      min-width: 220px; max-width: 320px;
+      padding: 10px 16px; border-radius: 8px; font-size: 0.84rem; font-weight: 600;
+      z-index: 5; pointer-events: none; letter-spacing: 0.01em;
+      border: 1px solid transparent;
+      box-shadow: 0 2px 14px rgba(0,0,0,0.45);
+      transition: background 0.4s, color 0.4s, border-color 0.4s;
     }
-    #status-banner.banner-ok       { background: rgba(35,134,54,0.85);  color: #d3f8de; }
-    #status-banner.banner-warning  { background: rgba(163,103,3,0.85);  color: #ffd88a; }
-    #status-banner.banner-critical { background: rgba(185,28,28,0.85);  color: #ffd0ce; }
+    #status-banner.banner-ok       { background: rgba(16,80,36,0.94);  border-color: rgba(86,211,100,0.35); color: #c8f5d5; }
+    #status-banner.banner-warning  { background: rgba(110,60,0,0.94);  border-color: rgba(230,184,70,0.35);  color: #ffe0a0; }
+    #status-banner.banner-critical { background: rgba(110,18,18,0.94); border-color: rgba(248,81,73,0.40);  color: #ffd0ce; }
 
     /* ── Panel Tooltip ───────────────────────────────── */
     @keyframes tooltip-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -338,9 +341,9 @@
 
     /* ── Toast Notifications ─────────────────────────── */
     #toast-container {
-      position: fixed; top: 60px; right: 16px; z-index: 3000;
+      position: fixed; top: 60px; right: 276px; z-index: 3000;
       display: flex; flex-direction: column; gap: 8px; pointer-events: none;
-      max-width: 340px;
+      max-width: 320px;
     }
     @keyframes toast-in  { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
     @keyframes toast-out { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(20px); } }
@@ -385,7 +388,7 @@
       <select id="cfg-type">
         <option value="60CEL">60 células — 360 Wp · 1,65 m²</option>
         <option value="72CEL">72 células — 440 Wp · 2,00 m²</option>
-        <option value="MODERNO">Moderno (alta densidade) — 682 Wp · 3,10 m²</option>
+        <option value="144CEL">144 células — 682 Wp · 3,10 m²</option>
       </select>
     </div>
     <div class="field-row">
@@ -634,10 +637,10 @@
       'cfg.err.max100':   (r,c,t) => `${r} × ${c} = ${t} painéis — máximo é 100.`,
       'pt.60CEL':         '60 células — 360 Wp · 1,65 m²',
       'pt.72CEL':         '72 células — 440 Wp · 2,00 m²',
-      'pt.MODERNO':       'Moderno (alta densidade) — 682 Wp · 3,10 m²',
+      'pt.144CEL':        '144 células — 682 Wp · 3,10 m²',
       'hdr.60CEL':        '60 células — 360 Wp',
       'hdr.72CEL':        '72 células — 440 Wp',
-      'hdr.MODERNO':      'Moderno — 682 Wp',
+      'hdr.144CEL':       '144 células — 682 Wp',
       'hdr.panels':       (r,c,t) => `${r} × ${c}  (${t} painéis)`,
       'sb.simulation':    'Controlador da Simulação',
       'ctrl.running':     'Em andamento',
@@ -714,10 +717,10 @@
       'cfg.err.max100':   (r,c,t) => `${r} × ${c} = ${t} panels — maximum is 100.`,
       'pt.60CEL':         '60 cells — 360 Wp · 1.65 m²',
       'pt.72CEL':         '72 cells — 440 Wp · 2.00 m²',
-      'pt.MODERNO':       'Modern (high density) — 682 Wp · 3.10 m²',
+      'pt.144CEL':        '144 cells — 682 Wp · 3.10 m²',
       'hdr.60CEL':        '60 cells — 360 Wp',
       'hdr.72CEL':        '72 cells — 440 Wp',
-      'hdr.MODERNO':      'Modern — 682 Wp',
+      'hdr.144CEL':       '144 cells — 682 Wp',
       'hdr.panels':       (r,c,t) => `${r} × ${c}  (${t} panels)`,
       'sb.simulation':    'Simulation Controller',
       'ctrl.running':     'Running',
@@ -818,7 +821,7 @@
     document.getElementById('cfg-label-cols').textContent    = t('cfg.lbl.cols');
     document.getElementById('btn-submit').textContent        = t('cfg.submit');
     const typeOpts = document.getElementById('cfg-type').options;
-    ['60CEL','72CEL','MODERNO'].forEach((v, i) => { typeOpts[i].textContent = t(`pt.${v}`); });
+    ['60CEL','72CEL','144CEL'].forEach((v, i) => { typeOpts[i].textContent = t(`pt.${v}`); });
 
     document.getElementById('sb-simulation').textContent    = t('sb.simulation');
     document.getElementById('ctrl-speed-lbl').textContent   = t('ctrl.speed');

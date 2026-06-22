@@ -518,22 +518,31 @@ window.Dashboard = (() => {
     const banner = document.getElementById('status-banner');
     if (!banner) return;
 
-    const hasAutoOff   = panels.some(p => p.status === 'auto_off');
-    const lowEffPanels = panels.filter(p => p.efficiency < 60 && p.efficiency > 0 && p.status !== 'corrupted');
-    const allOk        = panels.every(p => p.status === 'normal' || p.efficiency === 0);
+    // Qualquer status que não seja 'normal' é um problema visível no mapa 3D.
+    // Agrupa por gravidade: desligados (crítico) > baixa eficiência < 50% (crítico) > degradados (aviso)
+    const offPanels  = panels.filter(p => p.status === 'auto_off');
+    const critPanels = panels.filter(p =>
+      p.status !== 'normal' && p.status !== 'auto_off' && p.status !== 'corrupted' &&
+      p.efficiency < 50 && p.efficiency > 0
+    );
+    const warnPanels = panels.filter(p =>
+      p.status !== 'normal' && p.status !== 'auto_off' && p.status !== 'corrupted' &&
+      p.efficiency >= 50
+    );
 
-    if (hasAutoOff) {
-      banner.className   = 'banner-critical';
-      banner.textContent = `⛔ ${panels.filter(p => p.status === 'auto_off').length} painel(is) desligado(s) — verifique o sistema`;
-    } else if (lowEffPanels.length > 0) {
-      banner.className   = 'banner-warning';
-      banner.textContent = `⚠ ${lowEffPanels.length} painel(is) com eficiência baixa`;
-    } else if (m.ghi <= 0) {
+    const parts = [];
+    if (offPanels.length  > 0) parts.push(`⛔ ${offPanels.length} desligado${offPanels.length  > 1 ? 's' : ''}`);
+    if (critPanels.length > 0) parts.push(`🔴 ${critPanels.length} em falha crítica`);
+    if (warnPanels.length > 0) parts.push(`⚠ ${warnPanels.length} com desempenho reduzido`);
+
+    if (parts.length === 0) {
       banner.className   = 'banner-ok';
-      banner.textContent = '🌙 Período noturno — aguardando luz solar';
+      banner.textContent = m.ghi <= 10
+        ? '🌙 Período noturno — aguardando luz solar'
+        : '✅ Sistema operando normalmente';
     } else {
-      banner.className   = 'banner-ok';
-      banner.textContent = '✅ Sistema operando normalmente';
+      banner.className   = (offPanels.length + critPanels.length) > 0 ? 'banner-critical' : 'banner-warning';
+      banner.textContent = parts.join('  ·  ');
     }
   }
 
